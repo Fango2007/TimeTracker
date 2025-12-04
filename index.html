@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>TimeWise</title>
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,500,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-3">
+    <a class="navbar-brand" href="#">TimeWise</a>
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link active" href="#" data-view-target="timer-view">Timer</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-view-target="activities-view">Activities</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-view-target="statistics">Statistics</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-view-target="history">History</a>
+      </li>
+    </ul>
+  </nav>
+
+  <div class="container-fluid">
+    <!-- Timer View -->
+    <section id="timer-view" class="view-section active">
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center mb-3">
+                <h5 class="mb-0">Activities</h5>
+              </div>
+              <div class="form-row mb-2">
+                <div class="form-group col-12">
+                  <label class="small mb-1">Category</label>
+                  <select id="filter-category" class="form-control form-control-sm"></select>
+                </div>
+                <div class="form-group col-6">
+                  <label class="small mb-1">Priority</label>
+                  <select id="filter-priority" class="form-control form-control-sm"></select>
+                </div>
+                <div class="form-group col-6">
+                  <label class="small mb-1">Cognitive Load</label>
+                  <select id="filter-cognitive" class="form-control form-control-sm"></select>
+                </div>
+              </div>
+              <ul class="list-group" id="activity-list"></ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <div class="text-muted small">Current activity</div>
+                  <div id="current-activity-label" class="h4 mb-0">No active session</div>
+                </div>
+              </div>
+              <div class="timer-display mb-3 text-center" id="timer-display">00:00:00</div>
+              <div class="mb-3">
+                <div class="d-flex justify-content-between">
+                  <span id="session-max-text" class="small text-muted">Session max: —</span>
+                  <span id="daily-max-text" class="small text-muted">Daily max: —</span>
+                </div>
+                <div class="progress mb-2">
+                  <div id="session-max-bar" class="progress-bar bg-success" style="width:0%"></div>
+                </div>
+                <div class="progress">
+                  <div id="daily-max-bar" class="progress-bar bg-success" style="width:0%"></div>
+                </div>
+                <div class="small text-muted mt-1" id="today-total-text"></div>
+              </div>
+              <div class="btn-group" role="group" aria-label="Timer controls">
+                <button class="btn btn-primary" id="btn-start">Start</button>
+                <button class="btn btn-secondary" id="btn-pause" disabled>Pause</button>
+                <button class="btn btn-secondary" id="btn-resume" disabled>Resume</button>
+                <button class="btn btn-danger" id="btn-stop" disabled>Stop</button>
+                <button class="btn btn-outline-danger" id="btn-reset" disabled>Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Activities View -->
+    <section id="activities-view" class="view-section">
+      <div class="row">
+        <div class="col-lg-4 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Create / Update Activity</h5>
+              <form id="activity-form">
+                <div class="form-group">
+                  <label for="activity-label">Label</label>
+                  <input type="text" class="form-control" id="activity-label" required>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label for="activity-category">Category</label>
+                    <select id="activity-category" class="form-control">
+                      <option value="professional">Professional</option>
+                      <option value="personal">Personal</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-6">
+                    <label for="activity-priority">Priority</label>
+                    <select id="activity-priority" class="form-control">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label for="activity-cognitive">Cognitive Load</label>
+                    <select id="activity-cognitive" class="form-control">
+                      <option value="light">Light</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="intense">Intense</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-6">
+                    <label for="activity-daily-max">Daily Max (minutes)</label>
+                    <input type="number" min="0" class="form-control" id="activity-daily-max" placeholder="Optional">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="activity-session-max">Session Max (minutes)</label>
+                  <input type="number" min="0" class="form-control" id="activity-session-max" placeholder="Optional">
+                </div>
+                <div class="text-danger small mb-2" id="activity-form-error"></div>
+                <div class="d-flex">
+                  <button type="submit" class="btn btn-primary mr-2" id="activity-submit">Create Activity</button>
+                  <button class="btn btn-outline-secondary" id="activity-cancel">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-8 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Activities</h5>
+                <div>
+                  <button class="btn btn-sm btn-outline-success mr-2" id="export-btn">Export JSON</button>
+                  <button class="btn btn-sm btn-outline-success mr-2" id="export-csv-btn">Export CSV</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Category</th>
+                      <th>Priority</th>
+                      <th>Cognitive</th>
+                      <th>Daily Max</th>
+                      <th>Session Max</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="activities-table-body"></tbody>
+                </table>
+              </div>
+              <div class="mt-3">
+                <h6>Import JSON</h6>
+                <textarea class="form-control import-area" id="import-json-input" placeholder='Paste exported JSON here'></textarea>
+                <button class="btn btn-primary btn-sm mt-2" id="import-btn">Import</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Statistics View -->
+    <section id="statistics" class="view-section">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Statistics</h5>
+            <div class="btn-group btn-group-toggle" data-toggle="buttons">
+              <label class="btn btn-light active" data-stats-period="daily">
+                <input type="radio" name="stats-period" autocomplete="off" checked> Daily
+              </label>
+              <label class="btn btn-light" data-stats-period="weekly">
+                <input type="radio" name="stats-period" autocomplete="off"> Weekly
+              </label>
+              <label class="btn btn-light" data-stats-period="monthly">
+                <input type="radio" name="stats-period" autocomplete="off"> Monthly
+              </label>
+            </div>
+          </div>
+          <canvas id="statsChart" height="120"></canvas>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th>Category</th>
+                  <th>Priority</th>
+                  <th>Cognitive</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="stats-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History View -->
+    <section id="history" class="view-section">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="mb-3">History</h5>
+          <ul class="list-group" id="history-list"></ul>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/activities.js"></script>
+  <script src="js/timer.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

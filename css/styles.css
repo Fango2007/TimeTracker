@@ -1,0 +1,54 @@
+body {
+  font-family: 'Montserrat', sans-serif;
+  background: #f7f8fb;
+}
+
+.navbar-brand {
+  font-weight: 700;
+}
+
+.view-section {
+  display: none;
+}
+
+.view-section.active {
+  display: block;
+}
+
+.activity-item {
+  cursor: pointer;
+}
+
+.activity-item.active {
+  border-color: #007bff;
+  background: #e8f2ff;
+}
+
+.activity-badges .badge {
+  margin-right: 4px;
+}
+
+.drag-handle {
+  cursor: grab;
+}
+
+.timer-display {
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+.card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.progress {
+  height: 10px;
+}
+
+.import-area {
+  min-height: 120px;
+}
+
+details summary {
+  cursor: pointer;
+}
