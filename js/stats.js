@@ -20,6 +20,7 @@
         totals.set(session.activityId, (totals.get(session.activityId) || 0) + duration);
       }
     });
+    const priorityRank = { high: 0, medium: 1, low: 2 };
     const rows = Array.from(totals.entries())
       .map(([activityId, seconds]) => {
         const act = activityMap.get(activityId) || {
@@ -39,7 +40,12 @@
           totalFormatted: formatMinutesLabel(toMinutes(seconds))
         };
       })
-      .sort((a, b) => b.totalSeconds - a.totalSeconds);
+      .sort((a, b) => {
+        const rankA = priorityRank[a.priority] ?? 3;
+        const rankB = priorityRank[b.priority] ?? 3;
+        if (rankA !== rankB) return rankA - rankB;
+        return b.totalSeconds - a.totalSeconds;
+      });
     return { label, totalSeconds, rows };
   };
 
