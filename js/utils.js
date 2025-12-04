@@ -84,6 +84,11 @@ const startOfMonth = date => {
   return d;
 };
 
+const getWeekdayKey = date => {
+  const day = new Date(date).getDay(); // 0 = Sunday
+  return WEEKDAYS[day === 0 ? 6 : day - 1];
+};
+
 const isValidPriority = value => PRIORITIES.includes(value);
 const isValidCognitiveLoad = value => COGNITIVE_LOADS.includes(value);
 const isValidCategory = value => CATEGORIES.includes(value);
@@ -105,6 +110,7 @@ window.TimeWiseUtils = {
   getDateKey,
   startOfWeek,
   startOfMonth,
+  getWeekdayKey,
   isValidPriority,
   isValidCognitiveLoad,
   isValidCategory,

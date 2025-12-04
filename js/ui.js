@@ -26,6 +26,8 @@
   let statsChart = null;
   let statsPeriod = 'daily';
   let userConfig = getUserConfig();
+  let statsSelectedIndex = 0;
+  let statsData = null;
 
   const elements = {
     navLinks: $('[data-view-target]'),
@@ -529,32 +531,133 @@
     });
   };
 
+  const buildColors = (count, selectedIdx, base, highlight) =>
+    Array.from({ length: count }, (_, idx) => (idx === selectedIdx ? highlight : base));
+
+  const updateStatsChartSelection = () => {
+    if (!statsChart || !statsData) return;
+    const count = statsData.labels.length;
+    statsChart.data.datasets[0].backgroundColor = buildColors(
+      count,
+      statsSelectedIndex,
+      'rgba(54, 162, 235, 0.35)',
+      'rgba(54, 162, 235, 0.75)'
+    );
+    statsChart.data.datasets[1].backgroundColor = buildColors(
+      count,
+      statsSelectedIndex,
+      'rgba(201, 203, 207, 0.35)',
+      'rgba(201, 203, 207, 0.75)'
+    );
+    statsChart.update();
+  };
+
+  const renderStatsTable = () => {
+    elements.statsTableBody.empty();
+    if (!statsData || !statsData.units || !statsData.units.length) {
+      elements.statsTableBody.append(
+        '<tr><td colspan="7" class="text-muted">No data available.</td></tr>'
+      );
+      return;
+    }
+    const unit =
+      statsData.units[statsSelectedIndex] ||
+      statsData.units[statsData.units.length - 1];
+    if (!unit || !unit.rows.length) {
+      elements.statsTableBody.append(
+        '<tr><td colspan="7" class="text-muted">No tracked time for selection.</td></tr>'
+      );
+      return;
+    }
+    unit.rows.forEach(row => {
+      const tr = $(`
+        <tr>
+          <td>${row.label}</td>
+          <td class="text-capitalize">${row.category}</td>
+          <td><span class="badge badge-${priorityColor(row.priority)}">${row.priority}</span></td>
+          <td class="text-capitalize">${row.cognitiveLoad}</td>
+          <td>${row.archived ? 'Archived' : ''}</td>
+          <td>${row.totalFormatted}</td>
+          <td>${row.percent}%</td>
+        </tr>
+      `);
+      elements.statsTableBody.append(tr);
+    });
+  };
+
+  const setStatsSelection = index => {
+    if (!statsData || !statsData.labels.length) return;
+    statsSelectedIndex = Math.max(0, Math.min(index, statsData.labels.length - 1));
+    updateStatsChartSelection();
+    renderStatsTable();
+  };
+
   const renderStats = period => {
     statsPeriod = period;
     elements.statsTabs.removeClass('active');
     elements.statsTabs.filter(`[data-stats-period="${period}"]`).addClass('active');
 
-    const stats = Stats.getStats(period);
+    statsData = Stats.getStats(period);
+    statsSelectedIndex = Math.max(statsData.labels.length - 1, 0);
+
     const ctx = document.getElementById('statsChart').getContext('2d');
     if (statsChart) statsChart.destroy();
     statsChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: stats.labels,
+        labels: statsData.labels,
         datasets: [
           {
-            label: 'Minutes',
-            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            label: 'Tracked (minutes)',
+            backgroundColor: buildColors(
+              statsData.labels.length,
+              statsSelectedIndex,
+              'rgba(54, 162, 235, 0.35)',
+              'rgba(54, 162, 235, 0.75)'
+            ),
             borderColor: 'rgba(54, 162, 235, 1)',
-            data: stats.data
+            data: statsData.tracked,
+            stack: 'time'
+          },
+          {
+            label: 'Inactivity (minutes)',
+            backgroundColor: buildColors(
+              statsData.labels.length,
+              statsSelectedIndex,
+              'rgba(201, 203, 207, 0.35)',
+              'rgba(201, 203, 207, 0.75)'
+            ),
+            borderColor: 'rgba(201, 203, 207, 1)',
+            data: statsData.inactivity,
+            stack: 'time'
           }
         ]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        onClick: (_evt, elements) => {
+          if (elements && elements.length) {
+            setStatsSelection(elements[0]._index);
+          }
+        },
+        tooltips: {
+          callbacks: {
+            label: (tooltipItem, data) => {
+              const label = data.datasets[tooltipItem.datasetIndex].label || '';
+              return `${label}: ${tooltipItem.yLabel}m`;
+            }
+          }
+        },
         scales: {
+          xAxes: [
+            {
+              stacked: true
+            }
+          ],
           yAxes: [
             {
+              stacked: true,
               ticks: {
                 beginAtZero: true
               }
@@ -564,20 +667,7 @@
       }
     });
 
-    elements.statsTableBody.empty();
-    stats.table.forEach(row => {
-      const tr = $(`
-        <tr>
-          <td>${row.label}</td>
-          <td class="text-capitalize">${row.category}</td>
-          <td><span class="badge badge-${priorityColor(row.priority)}">${row.priority}</span></td>
-          <td class="text-capitalize">${row.cognitiveLoad}</td>
-          <td>${row.archived ? 'Archived' : ''}</td>
-          <td>${row.totalFormatted}</td>
-        </tr>
-      `);
-      elements.statsTableBody.append(tr);
-    });
+    renderStatsTable();
   };
 
   const renderSettingsForm = () => {
