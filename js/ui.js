@@ -5,10 +5,17 @@
     formatMinutesLabel,
     PRIORITIES,
     COGNITIVE_LOADS,
-    CATEGORIES
+    CATEGORIES,
+    WEEKDAYS
   } = window.TimeWiseUtils;
-  const { getActivities, saveActivities, exportAll, importAll, getSessions } =
-    window.TimeWiseStorage;
+  const {
+    getActivities,
+    exportAll,
+    importAll,
+    getSessions,
+    getUserConfig,
+    saveUserConfig
+  } = window.TimeWiseStorage;
   const Activities = window.TimeWiseActivities;
   const Timer = window.TimeWiseTimer;
   const Stats = window.TimeWiseStats;
@@ -18,6 +25,7 @@
   let editingActivityId = null;
   let statsChart = null;
   let statsPeriod = 'daily';
+  let userConfig = getUserConfig();
 
   const elements = {
     navLinks: $('[data-view-target]'),
@@ -43,13 +51,29 @@
     activityForm: $('#activity-form'),
     activityFormError: $('#activity-form-error'),
     activitiesTableBody: $('#activities-table-body'),
-    importInput: $('#import-json-input'),
-    importBtn: $('#import-btn'),
-    exportBtn: $('#export-btn'),
-    exportCsvBtn: $('#export-csv-btn'),
     historyList: $('#history-list'),
     statsTabs: $('[data-stats-period]'),
-    statsTableBody: $('#stats-table-body')
+    statsTableBody: $('#stats-table-body'),
+    // Settings
+    settingsForm: $('#settings-form'),
+    settingsError: $('#settings-error'),
+    settingsSuccess: $('#settings-success'),
+    defaultSessionMax: $('#default-session-max'),
+    defaultDailyMax: $('#default-daily-max'),
+    weekStartInputs: $('input[name="week-start"]'),
+    settingsImportArea: $('#settings-import-json'),
+    settingsImportBtn: $('#settings-import-btn'),
+    settingsExportJsonBtn: $('#settings-export-json'),
+    settingsExportCsvBtn: $('#settings-export-csv'),
+    importError: $('#import-error')
+  };
+  elements.dailyTargetInputs = WEEKDAYS.reduce((acc, day) => {
+    acc[day] = $(`#target-${day}`);
+    return acc;
+  }, {});
+
+  const refreshUserConfig = () => {
+    userConfig = getUserConfig();
   };
 
   const switchView = target => {
@@ -201,6 +225,14 @@
     elements.activityForm[0].reset();
     $('#activity-submit').text('Create Activity');
     elements.activityFormError.text('');
+    $('#activity-priority').val('medium');
+    $('#activity-cognitive').val('moderate');
+    $('#activity-daily-max').val(
+      userConfig.defaultDailyMaxMinutes !== null ? userConfig.defaultDailyMaxMinutes : ''
+    );
+    $('#activity-session-max').val(
+      userConfig.defaultSessionMaxMinutes !== null ? userConfig.defaultSessionMaxMinutes : ''
+    );
   };
 
   const handleStartFromList = activityId => {
@@ -336,6 +368,7 @@
   };
 
   const refreshAll = () => {
+    refreshUserConfig();
     renderActivityOptions();
     renderActivitiesTable();
     renderHistory();
@@ -353,6 +386,9 @@
       }
       if (target === 'history') {
         renderHistory();
+      }
+      if (target === 'settings-view') {
+        renderSettingsForm();
       }
     });
   };
@@ -400,7 +436,7 @@
   };
 
   const bindImportExport = () => {
-    elements.exportBtn.on('click', () => {
+    elements.settingsExportJsonBtn.on('click', () => {
       const dataStr = JSON.stringify(exportAll(), null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -413,7 +449,7 @@
       URL.revokeObjectURL(url);
     });
 
-    elements.exportCsvBtn.on('click', () => {
+    elements.settingsExportCsvBtn.on('click', () => {
       const sessions = getSessions();
       const header = ['Session ID', 'Activity ID', 'Start', 'End', 'Total Seconds'];
       const rows = sessions.map(s => [
@@ -437,15 +473,18 @@
       URL.revokeObjectURL(url);
     });
 
-    elements.importBtn.on('click', () => {
-      const raw = elements.importInput.val();
+    elements.settingsImportBtn.on('click', () => {
+      elements.importError.text('');
+      const raw = elements.settingsImportArea.val();
       try {
         const parsed = JSON.parse(raw);
         importAll(parsed);
+        refreshUserConfig();
+        renderSettingsForm();
         alert('Data imported successfully.');
         refreshAll();
       } catch (err) {
-        alert('Invalid JSON. Existing data untouched.');
+        elements.importError.text(err.message || 'Invalid JSON. Existing data untouched.');
       }
     });
   };
@@ -541,6 +580,75 @@
     });
   };
 
+  const renderSettingsForm = () => {
+    refreshUserConfig();
+    elements.settingsError.text('');
+    elements.settingsSuccess.text('');
+    elements.importError.text('');
+    elements.defaultSessionMax.val(
+      userConfig.defaultSessionMaxMinutes !== null ? userConfig.defaultSessionMaxMinutes : ''
+    );
+    elements.defaultDailyMax.val(
+      userConfig.defaultDailyMaxMinutes !== null ? userConfig.defaultDailyMaxMinutes : ''
+    );
+    WEEKDAYS.forEach(day => {
+      const targetValue =
+        userConfig.dailyWorkTargets && userConfig.dailyWorkTargets[day] !== undefined
+          ? userConfig.dailyWorkTargets[day]
+          : '';
+      elements.dailyTargetInputs[day].val(targetValue);
+    });
+    elements.weekStartInputs.prop('checked', false);
+    elements.weekStartInputs
+      .filter(`[value="${userConfig.weekStart}"]`)
+      .prop('checked', true);
+  };
+
+  const bindSettingsForm = () => {
+    elements.settingsForm.on('submit', e => {
+      e.preventDefault();
+      elements.settingsError.text('');
+      elements.settingsSuccess.text('');
+      const parseMinutes = (value, label) => {
+        if (value === '' || value === null) return null;
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) throw new Error(`${label} must be zero or positive`);
+        return num;
+      };
+      const defaultSessionMax = parseMinutes(
+        elements.defaultSessionMax.val(),
+        'Default session max'
+      );
+      const defaultDailyMax = parseMinutes(elements.defaultDailyMax.val(), 'Default daily max');
+      const dailyWorkTargets = {};
+      WEEKDAYS.forEach(day => {
+        const raw = elements.dailyTargetInputs[day].val();
+        const num = raw === '' || raw === null ? 0 : Number(raw);
+        if (!Number.isFinite(num) || num < 0) {
+          throw new Error('Daily work targets must be zero or positive numbers');
+        }
+        dailyWorkTargets[day] = num;
+      });
+      const weekStart = elements.weekStartInputs.filter(':checked').val() || 'monday';
+      try {
+        saveUserConfig({
+          defaultSessionMaxMinutes: defaultSessionMax,
+          defaultDailyMaxMinutes: defaultDailyMax,
+          dailyWorkTargets,
+          weekStart
+        });
+        refreshUserConfig();
+        elements.settingsSuccess.text('Settings saved.');
+        if (!editingActivityId) {
+          resetForm();
+        }
+        renderStats(statsPeriod);
+      } catch (err) {
+        elements.settingsError.text(err.message || 'Failed to save settings.');
+      }
+    });
+  };
+
   const bindStatsTabs = () => {
     elements.statsTabs.on('click', function (e) {
       e.preventDefault();
@@ -568,13 +676,16 @@
     bindFilters();
     bindTimerButtons();
     bindActivityForm();
+    bindSettingsForm();
     bindImportExport();
     bindStatsTabs();
     Timer.subscribe(handleTimerEvents);
+    resetForm();
     renderActivityOptions();
     renderActivitiesTable();
     renderHistory();
     renderStats(statsPeriod);
+    renderSettingsForm();
     updateTimerPanel();
   };
 

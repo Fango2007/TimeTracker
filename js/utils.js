@@ -2,6 +2,15 @@
 const PRIORITIES = ['low', 'medium', 'high'];
 const COGNITIVE_LOADS = ['light', 'moderate', 'intense'];
 const CATEGORIES = ['professional', 'personal'];
+const WEEKDAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday'
+];
 
 const generateId = () => {
   if (window.crypto?.randomUUID) {
@@ -57,10 +66,12 @@ const getDateKey = ts => {
   return `${d.getFullYear()}-${month}-${day}`;
 };
 
-const startOfWeek = date => {
+const startOfWeek = (date, weekStart = 'monday') => {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1) - day; // Monday as first day
+  const startsOnSunday = weekStart === 'sunday';
+  const day = d.getDay(); // 0 = Sunday
+  const normalizedDay = startsOnSunday ? day : day === 0 ? 6 : day - 1; // 0-indexed based on start
+  const diff = -normalizedDay;
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -101,5 +112,6 @@ window.TimeWiseUtils = {
   sumSeconds,
   PRIORITIES,
   COGNITIVE_LOADS,
-  CATEGORIES
+  CATEGORIES,
+  WEEKDAYS
 };

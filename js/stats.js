@@ -1,6 +1,6 @@
 // Statistics aggregation for daily / weekly / monthly charts and tables
 (() => {
-  const { getSessions, getActivities } = window.TimeWiseStorage;
+  const { getSessions, getActivities, getUserConfig } = window.TimeWiseStorage;
   const {
     getDateKey,
     startOfWeek,
@@ -32,11 +32,11 @@
     return { labels, data };
   };
 
-  const buildWeeklySeries = (sessions, weeks = 8) => {
+  const buildWeeklySeries = (sessions, weekStart = 'monday', weeks = 8) => {
     const labels = [];
     const data = [];
     const now = new Date();
-    const currentWeekStart = startOfWeek(now);
+    const currentWeekStart = startOfWeek(now, weekStart);
     for (let i = weeks - 1; i >= 0; i--) {
       const start = new Date(currentWeekStart);
       start.setDate(start.getDate() - i * 7);
@@ -110,6 +110,8 @@
 
   const getStats = period => {
     const sessions = getSessions();
+    const config = getUserConfig();
+    const weekStartPref = config.weekStart || 'monday';
     if (period === 'daily') {
       const rangeStart = (() => {
         const d = new Date();
@@ -124,12 +126,12 @@
     }
     if (period === 'weekly') {
       const rangeStart = (() => {
-        const d = startOfWeek(new Date());
+        const d = startOfWeek(new Date(), weekStartPref);
         d.setDate(d.getDate() - 7 * 7);
         return d.getTime();
       })();
       return {
-        ...buildWeeklySeries(sessions),
+        ...buildWeeklySeries(sessions, weekStartPref),
         table: buildActivityTable(sessions, rangeStart)
       };
     }
