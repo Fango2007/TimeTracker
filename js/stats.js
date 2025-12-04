@@ -1,10 +1,11 @@
-// Statistics aggregation for daily / weekly / monthly charts and tables
+// Statistics aggregation with selectable unit and navigation (no inactivity)
 (() => {
   const { getSessions, getActivities, getUserConfig } = window.TimeWiseStorage;
   const { getDateKey, startOfWeek, startOfMonth, formatMinutesLabel } =
     window.TimeWiseUtils;
 
   const toMinutes = seconds => Math.round((seconds || 0) / 60);
+  const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
   const buildActivityMap = () =>
     new Map(getActivities().map(act => [act.id, act]));
@@ -20,7 +21,6 @@
         totals.set(session.activityId, (totals.get(session.activityId) || 0) + duration);
       }
     });
-    const priorityRank = { high: 0, medium: 1, low: 2 };
     const rows = Array.from(totals.entries())
       .map(([activityId, seconds]) => {
         const act = activityMap.get(activityId) || {
@@ -41,23 +41,24 @@
         };
       })
       .sort((a, b) => {
-        const rankA = priorityRank[a.priority] ?? 3;
-        const rankB = priorityRank[b.priority] ?? 3;
+        const rankA = PRIORITY_RANK[a.priority] ?? 3;
+        const rankB = PRIORITY_RANK[b.priority] ?? 3;
         if (rankA !== rankB) return rankA - rankB;
         return b.totalSeconds - a.totalSeconds;
       });
     return { label, totalSeconds, rows };
   };
 
-  const buildDailySeries = (sessions, activityMap, days = 7) => {
+  const buildDailySeries = (sessions, activityMap, offset = 0, days = 7) => {
     const labels = [];
     const data = [];
     const units = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const endDay = new Date();
+    endDay.setHours(0, 0, 0, 0);
+    endDay.setDate(endDay.getDate() - offset);
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+      const d = new Date(endDay);
+      d.setDate(endDay.getDate() - i);
       const start = d.getTime();
       const end = start + 24 * 60 * 60 * 1000;
       const label = `${d.getMonth() + 1}/${d.getDate()}`;
@@ -66,15 +67,18 @@
       data.push(toMinutes(unit.totalSeconds));
       units.push(unit);
     }
-    return { labels, data, units };
+    const startWindow = new Date(endDay);
+    startWindow.setDate(endDay.getDate() - (days - 1));
+    return { labels, data, units, windowStart: startWindow.getTime() };
   };
 
-  const buildWeeklySeries = (sessions, activityMap, weekStart = 'monday', weeks = 8) => {
+  const buildWeeklySeries = (sessions, activityMap, weekStart = 'monday', offset = 0, weeks = 8) => {
     const labels = [];
     const data = [];
     const units = [];
     const now = new Date();
     const currentWeekStart = startOfWeek(now, weekStart);
+    currentWeekStart.setDate(currentWeekStart.getDate() - offset * 7);
     for (let i = weeks - 1; i >= 0; i--) {
       const start = new Date(currentWeekStart);
       start.setDate(start.getDate() - i * 7);
@@ -86,17 +90,19 @@
       data.push(toMinutes(unit.totalSeconds));
       units.push(unit);
     }
-    return { labels, data, units };
+    const startWindow = new Date(currentWeekStart);
+    startWindow.setDate(currentWeekStart.getDate() - (weeks - 1) * 7);
+    return { labels, data, units, windowStart: startWindow.getTime() };
   };
 
-  const buildMonthlySeries = (sessions, activityMap, months = 6) => {
+  const buildMonthlySeries = (sessions, activityMap, offset = 0, months = 6) => {
     const labels = [];
     const data = [];
     const units = [];
     const now = new Date();
     for (let i = months - 1; i >= 0; i--) {
       const monthStart = startOfMonth(now);
-      monthStart.setMonth(monthStart.getMonth() - i);
+      monthStart.setMonth(monthStart.getMonth() - (i + offset));
       const nextMonth = startOfMonth(new Date(monthStart));
       nextMonth.setMonth(nextMonth.getMonth() + 1);
       const label = `${monthStart.getMonth() + 1}/${monthStart.getFullYear()}`;
@@ -111,24 +117,41 @@
       data.push(toMinutes(unit.totalSeconds));
       units.push(unit);
     }
-    return { labels, data, units };
+    const startWindow = startOfMonth(now);
+    startWindow.setMonth(startWindow.getMonth() - (months - 1 + offset));
+    return { labels, data, units, windowStart: startWindow.getTime() };
   };
 
-  const getStats = period => {
+  const getStats = (period, offset = 0) => {
     const sessions = getSessions();
     const activityMap = buildActivityMap();
     const config = getUserConfig();
     const weekStartPref = config.weekStart || 'monday';
+    const minSessionStart =
+      sessions.length > 0
+        ? Math.min(...sessions.map(s => s.sessionStart || Infinity))
+        : null;
+
+    let result;
     if (period === 'daily') {
-      return buildDailySeries(sessions, activityMap);
+      result = buildDailySeries(sessions, activityMap, offset);
+    } else if (period === 'weekly') {
+      result = buildWeeklySeries(sessions, activityMap, weekStartPref, offset);
+    } else {
+      result = buildMonthlySeries(sessions, activityMap, offset);
     }
-    if (period === 'weekly') {
-      return buildWeeklySeries(sessions, activityMap, weekStartPref);
-    }
-    return buildMonthlySeries(sessions, activityMap);
+
+    const hasPrev = minSessionStart !== null && result.windowStart > minSessionStart;
+    const hasNext = offset > 0;
+
+    return {
+      labels: result.labels,
+      data: result.data,
+      units: result.units,
+      hasPrev,
+      hasNext
+    };
   };
 
-  window.TimeWiseStats = {
-    getStats
-  };
+  window.TimeWiseStats = { getStats };
 })();

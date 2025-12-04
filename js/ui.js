@@ -30,6 +30,7 @@
   let userConfig = getUserConfig();
   let statsData = null;
   let statsSelectedIndex = 0;
+  let statsOffset = 0;
 
   const elements = {
     navLinks: $('[data-view-target]'),
@@ -60,6 +61,8 @@
     historyList: $('#history-list'),
     statsTabs: $('[data-stats-period]'),
     statsTableBody: $('#stats-table-body'),
+    statsPrev: $('#stats-prev'),
+    statsNext: $('#stats-next'),
     // Settings
     settingsForm: $('#settings-form'),
     settingsError: $('#settings-error'),
@@ -469,7 +472,7 @@
     renderDashboard();
     renderActivitiesTable();
     renderHistory();
-    renderStats(statsPeriod);
+    renderStats(statsPeriod, true);
     updateTimerPanel();
   };
 
@@ -660,12 +663,15 @@
     statsChart.update();
   };
 
-  const renderStats = period => {
+  const renderStats = (period, resetOffset = false) => {
+    if (resetOffset) {
+      statsOffset = 0;
+    }
     statsPeriod = period;
     elements.statsTabs.removeClass('active');
     elements.statsTabs.filter(`[data-stats-period="${period}"]`).addClass('active');
 
-    statsData = Stats.getStats(period);
+    statsData = Stats.getStats(period, statsOffset);
     statsSelectedIndex = Math.max(0, (statsData.labels?.length || 1) - 1);
 
     const ctx = document.getElementById('statsChart').getContext('2d');
@@ -705,6 +711,8 @@
       }
     });
 
+    elements.statsPrev.prop('disabled', !statsData.hasPrev);
+    elements.statsNext.prop('disabled', !statsData.hasNext);
     renderStatsTable();
   };
 
@@ -781,7 +789,21 @@
     elements.statsTabs.on('click', function (e) {
       e.preventDefault();
       const period = $(this).data('stats-period');
-      renderStats(period);
+      statsSelectedIndex = 0;
+      statsOffset = 0;
+      renderStats(period, true);
+    });
+    elements.statsPrev.on('click', () => {
+      if (statsData && statsData.hasPrev) {
+        statsOffset += 1;
+        renderStats(statsPeriod);
+      }
+    });
+    elements.statsNext.on('click', () => {
+      if (statsOffset > 0) {
+        statsOffset -= 1;
+        renderStats(statsPeriod);
+      }
     });
   };
 
@@ -798,7 +820,7 @@
     renderDashboard();
     renderActivitiesTable();
     renderHistory();
-    renderStats(statsPeriod);
+    renderStats(statsPeriod, true);
     renderSettingsForm();
     updateTimerPanel();
   };
