@@ -49,15 +49,16 @@
     return { label, totalSeconds, rows };
   };
 
-  const buildDailySeries = (sessions, activityMap, days = 7) => {
+  const buildDailySeries = (sessions, activityMap, offset = 0, days = 7) => {
     const labels = [];
     const data = [];
     const units = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const endDay = new Date();
+    endDay.setHours(0, 0, 0, 0);
+    endDay.setDate(endDay.getDate() - offset);
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+      const d = new Date(endDay);
+      d.setDate(endDay.getDate() - i);
       const start = d.getTime();
       const end = start + 24 * 60 * 60 * 1000;
       const label = `${d.getMonth() + 1}/${d.getDate()}`;
@@ -69,12 +70,13 @@
     return { labels, data, units };
   };
 
-  const buildWeeklySeries = (sessions, activityMap, weekStart = 'monday', weeks = 8) => {
+  const buildWeeklySeries = (sessions, activityMap, weekStart = 'monday', offset = 0, weeks = 8) => {
     const labels = [];
     const data = [];
     const units = [];
     const now = new Date();
     const currentWeekStart = startOfWeek(now, weekStart);
+    currentWeekStart.setDate(currentWeekStart.getDate() - offset * 7);
     for (let i = weeks - 1; i >= 0; i--) {
       const start = new Date(currentWeekStart);
       start.setDate(start.getDate() - i * 7);
@@ -89,14 +91,14 @@
     return { labels, data, units };
   };
 
-  const buildMonthlySeries = (sessions, activityMap, months = 6) => {
+  const buildMonthlySeries = (sessions, activityMap, offset = 0, months = 6) => {
     const labels = [];
     const data = [];
     const units = [];
     const now = new Date();
     for (let i = months - 1; i >= 0; i--) {
       const monthStart = startOfMonth(now);
-      monthStart.setMonth(monthStart.getMonth() - i);
+      monthStart.setMonth(monthStart.getMonth() - (i + offset));
       const nextMonth = startOfMonth(new Date(monthStart));
       nextMonth.setMonth(nextMonth.getMonth() + 1);
       const label = `${monthStart.getMonth() + 1}/${monthStart.getFullYear()}`;
@@ -114,18 +116,51 @@
     return { labels, data, units };
   };
 
-  const getStats = period => {
+  const getStats = (period, offset = 0) => {
     const sessions = getSessions();
     const activityMap = buildActivityMap();
     const config = getUserConfig();
     const weekStartPref = config.weekStart || 'monday';
+    const minSessionStart =
+      sessions.length > 0
+        ? Math.min(...sessions.map(s => s.sessionStart || Infinity))
+        : null;
+
+    let windowStart = 0;
+    let result;
+
     if (period === 'daily') {
-      return buildDailySeries(sessions, activityMap);
+      result = buildDailySeries(sessions, activityMap, offset);
+      const endDay = new Date();
+      endDay.setHours(0, 0, 0, 0);
+      endDay.setDate(endDay.getDate() - offset);
+      const startDay = new Date(endDay);
+      startDay.setDate(startDay.getDate() - (result.units.length - 1));
+      windowStart = startDay.getTime();
+    } else if (period === 'weekly') {
+      result = buildWeeklySeries(sessions, activityMap, weekStartPref, offset);
+      const endWeek = startOfWeek(new Date(), weekStartPref);
+      endWeek.setDate(endWeek.getDate() - offset * 7);
+      const startWeek = new Date(endWeek);
+      startWeek.setDate(startWeek.getDate() - (result.units.length - 1) * 7);
+      windowStart = startWeek.getTime();
+    } else {
+      result = buildMonthlySeries(sessions, activityMap, offset);
+      const endMonth = startOfMonth(new Date());
+      endMonth.setMonth(endMonth.getMonth() - offset);
+      const startMonth = startOfMonth(new Date(endMonth));
+      startMonth.setMonth(startMonth.getMonth() - (result.units.length - 1));
+      windowStart = startMonth.getTime();
     }
-    if (period === 'weekly') {
-      return buildWeeklySeries(sessions, activityMap, weekStartPref);
-    }
-    return buildMonthlySeries(sessions, activityMap);
+
+    const hasPrev = minSessionStart !== null && windowStart > minSessionStart;
+    const hasNext = offset > 0;
+
+    return {
+      ...result,
+      hasPrev,
+      hasNext
+    };
   };
 
   window.TimeWiseStats = {
