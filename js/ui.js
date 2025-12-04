@@ -63,8 +63,6 @@
     statsTableBody: $('#stats-table-body'),
     statsPrev: $('#stats-prev'),
     statsNext: $('#stats-next'),
-    statsMin: $('#stats-min'),
-    statsMax: $('#stats-max'),
     // Settings
     settingsForm: $('#settings-form'),
     settingsError: $('#settings-error'),
@@ -678,6 +676,8 @@
 
     const ctx = document.getElementById('statsChart').getContext('2d');
     if (statsChart) statsChart.destroy();
+    const minVal = statsData.data.length ? Math.min(...statsData.data) : 0;
+    const maxVal = statsData.data.length ? Math.max(...statsData.data) : 0;
     const baseColors = statsData.labels.map((_, idx) =>
       idx === statsSelectedIndex ? 'rgba(54, 162, 235, 0.75)' : 'rgba(54, 162, 235, 0.3)'
     );
@@ -691,6 +691,24 @@
             backgroundColor: baseColors,
             borderColor: 'rgba(54, 162, 235, 1)',
             data: statsData.data
+          },
+          {
+            label: 'Min',
+            type: 'line',
+            borderColor: 'rgba(75, 192, 192, 0.8)',
+            borderDash: [4, 4],
+            fill: false,
+            pointRadius: 0,
+            data: statsData.labels.map(() => minVal)
+          },
+          {
+            label: 'Max',
+            type: 'line',
+            borderColor: 'rgba(255, 99, 132, 0.8)',
+            borderDash: [4, 4],
+            fill: false,
+            pointRadius: 0,
+            data: statsData.labels.map(() => maxVal)
           }
         ]
       },
