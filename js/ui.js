@@ -28,6 +28,9 @@
   let statsChart = null;
   let statsPeriod = 'daily';
   let userConfig = getUserConfig();
+  let statsData = null;
+  let statsSelectedIndex = 0;
+  let statsOffset = 0;
 
   const elements = {
     navLinks: $('[data-view-target]'),
@@ -58,6 +61,8 @@
     historyList: $('#history-list'),
     statsTabs: $('[data-stats-period]'),
     statsTableBody: $('#stats-table-body'),
+    statsPrev: $('#stats-prev'),
+    statsNext: $('#stats-next'),
     // Settings
     settingsForm: $('#settings-form'),
     settingsError: $('#settings-error'),
@@ -467,7 +472,7 @@
     renderDashboard();
     renderActivitiesTable();
     renderHistory();
-    renderStats(statsPeriod);
+    renderStats(statsPeriod, true);
     updateTimerPanel();
   };
 
@@ -618,43 +623,23 @@
     });
   };
 
-  const renderStats = period => {
-    statsPeriod = period;
-    elements.statsTabs.removeClass('active');
-    elements.statsTabs.filter(`[data-stats-period="${period}"]`).addClass('active');
-
-    const stats = Stats.getStats(period);
-    const ctx = document.getElementById('statsChart').getContext('2d');
-    if (statsChart) statsChart.destroy();
-    statsChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: stats.labels,
-        datasets: [
-          {
-            label: 'Minutes',
-            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            data: stats.data
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          yAxes: [
-            {
-              ticks: {
-                beginAtZero: true
-              }
-            }
-          ]
-        }
-      }
-    });
-
+  const renderStatsTable = () => {
     elements.statsTableBody.empty();
-    stats.table.forEach(row => {
+    if (!statsData || !statsData.units || !statsData.units.length) {
+      elements.statsTableBody.append(
+        '<tr><td colspan="6" class="text-muted">No data available.</td></tr>'
+      );
+      return;
+    }
+    const unit =
+      statsData.units[statsSelectedIndex] || statsData.units[statsData.units.length - 1];
+    if (!unit || !unit.rows.length) {
+      elements.statsTableBody.append(
+        '<tr><td colspan="6" class="text-muted">No tracked time for selection.</td></tr>'
+      );
+      return;
+    }
+    unit.rows.forEach(row => {
       const tr = $(`
         <tr>
           <td>${row.label}</td>
@@ -667,6 +652,68 @@
       `);
       elements.statsTableBody.append(tr);
     });
+  };
+
+  const updateStatsChartSelection = () => {
+    if (!statsChart || !statsData) return;
+    const colors = statsData.labels.map((_, idx) =>
+      idx === statsSelectedIndex ? 'rgba(54, 162, 235, 0.75)' : 'rgba(54, 162, 235, 0.3)'
+    );
+    statsChart.data.datasets[0].backgroundColor = colors;
+    statsChart.update();
+  };
+
+  const renderStats = (period, resetOffset = false) => {
+    if (resetOffset) {
+      statsOffset = 0;
+    }
+    statsPeriod = period;
+    elements.statsTabs.removeClass('active');
+    elements.statsTabs.filter(`[data-stats-period="${period}"]`).addClass('active');
+
+    statsData = Stats.getStats(period, statsOffset);
+    statsSelectedIndex = Math.max(0, (statsData.labels?.length || 1) - 1);
+
+    const ctx = document.getElementById('statsChart').getContext('2d');
+    if (statsChart) statsChart.destroy();
+    const baseColors = statsData.labels.map((_, idx) =>
+      idx === statsSelectedIndex ? 'rgba(54, 162, 235, 0.75)' : 'rgba(54, 162, 235, 0.3)'
+    );
+    statsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: statsData.labels,
+        datasets: [
+          {
+            label: 'Minutes',
+            backgroundColor: baseColors,
+            borderColor: 'rgba(54, 162, 235, 1)',
+            data: statsData.data
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          yAxes: [
+            {
+              ticks: { beginAtZero: true }
+            }
+          ]
+        },
+        onClick: (_evt, elementsArr) => {
+          if (elementsArr && elementsArr.length) {
+            statsSelectedIndex = elementsArr[0]._index;
+            updateStatsChartSelection();
+            renderStatsTable();
+          }
+        }
+      }
+    });
+
+    elements.statsPrev.prop('disabled', !statsData.hasPrev);
+    elements.statsNext.prop('disabled', !statsData.hasNext);
+    renderStatsTable();
   };
 
   const renderSettingsForm = () => {
@@ -742,7 +789,21 @@
     elements.statsTabs.on('click', function (e) {
       e.preventDefault();
       const period = $(this).data('stats-period');
-      renderStats(period);
+      statsSelectedIndex = 0;
+      statsOffset = 0;
+      renderStats(period, true);
+    });
+    elements.statsPrev.on('click', () => {
+      if (statsData && statsData.hasPrev) {
+        statsOffset += 1;
+        renderStats(statsPeriod);
+      }
+    });
+    elements.statsNext.on('click', () => {
+      if (statsOffset > 0) {
+        statsOffset -= 1;
+        renderStats(statsPeriod);
+      }
     });
   };
 
@@ -759,7 +820,7 @@
     renderDashboard();
     renderActivitiesTable();
     renderHistory();
-    renderStats(statsPeriod);
+    renderStats(statsPeriod, true);
     renderSettingsForm();
     updateTimerPanel();
   };
