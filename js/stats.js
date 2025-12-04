@@ -11,8 +11,13 @@
 
   const minutes = seconds => Math.round((seconds || 0) / 60);
 
-  const buildActivityMap = () =>
-    new Map(getActivities().map(act => [act.id, act]));
+  const buildActivityMap = () => new Map(getActivities().map(act => [act.id, act]));
+
+  const startOfDay = date => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
 
   const groupSessionsByDay = sessions => {
     const map = new Map();
@@ -27,31 +32,60 @@
   const buildDaySummaries = (sessions, startDate, endDate, config, activityMap) => {
     const sessionsByDay = groupSessionsByDay(sessions);
     const days = [];
-    const cursor = new Date(startDate);
-    cursor.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
+    const cursor = startOfDay(startDate);
+    const end = startOfDay(endDate);
     while (cursor.getTime() <= end.getTime()) {
       const key = getDateKey(cursor);
-      const daySessions = sessionsByDay.get(key) || [];
-      const perActivity = new Map();
-      let totalTracked = 0;
-      daySessions.forEach(session => {
-        const duration = session.totalDuration || 0;
-        totalTracked += duration;
-        perActivity.set(
-          session.activityId,
-          (perActivity.get(session.activityId) || 0) + duration
-        );
-      });
+      const daySessions = (sessionsByDay.get(key) || []).slice().sort(
+        (a, b) => a.sessionStart - b.sessionStart
+      );
+
       const targetHours = config.dailyWorkTargets[getWeekdayKey(cursor)] || 0;
       const targetSeconds = Math.max(0, targetHours * 3600);
-      const inactivitySeconds = Math.max(0, targetSeconds - totalTracked);
+      const perActivity = new Map();
+
+      let counted = 0;
+      let inactivitySeconds = 0;
+      let pointer = cursor.getTime();
+
+      const consumeGap = nextTs => {
+        if (counted >= targetSeconds) return;
+        const gap = Math.max(0, nextTs - pointer);
+        const add = Math.min(gap, targetSeconds - counted);
+        inactivitySeconds += add;
+        counted += add;
+        pointer = nextTs;
+      };
+
+      const consumeSession = (session) => {
+        if (counted >= targetSeconds) return;
+        const duration = session.totalDuration || 0;
+        const add = Math.min(duration, targetSeconds - counted);
+        if (add > 0) {
+          perActivity.set(
+            session.activityId,
+            (perActivity.get(session.activityId) || 0) + add
+          );
+          counted += add;
+        }
+        pointer = session.sessionStart + duration;
+      };
+
+      daySessions.forEach(session => {
+        consumeGap(session.sessionStart);
+        consumeSession(session);
+      });
+
+      if (counted < targetSeconds) {
+        inactivitySeconds += targetSeconds - counted;
+        counted = targetSeconds;
+      }
+
       days.push({
         key,
         label: `${cursor.getMonth() + 1}/${cursor.getDate()}`,
         date: new Date(cursor),
-        totalTrackedSeconds: totalTracked,
+        totalTrackedSeconds: Array.from(perActivity.values()).reduce((a, b) => a + b, 0),
         inactivitySeconds,
         perActivity
       });
