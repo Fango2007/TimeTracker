@@ -44,41 +44,42 @@
       const targetSeconds = Math.max(0, targetHours * 3600);
       const perActivity = new Map();
 
-      let counted = 0;
+      let countedSeconds = 0;
       let inactivitySeconds = 0;
-      let pointer = cursor.getTime();
+      let pointerSeconds = cursor.getTime() / 1000;
 
-      const consumeGap = nextTs => {
-        if (counted >= targetSeconds) return;
-        const gap = Math.max(0, nextTs - pointer);
-        const add = Math.min(gap, targetSeconds - counted);
+      const consumeGapSeconds = nextTsSeconds => {
+        if (countedSeconds >= targetSeconds) return;
+        const gapSeconds = Math.max(0, nextTsSeconds - pointerSeconds);
+        const add = Math.min(gapSeconds, targetSeconds - countedSeconds);
         inactivitySeconds += add;
-        counted += add;
-        pointer = nextTs;
+        countedSeconds += add;
+        pointerSeconds = nextTsSeconds;
       };
 
       const consumeSession = (session) => {
-        if (counted >= targetSeconds) return;
+        if (countedSeconds >= targetSeconds) return;
         const duration = session.totalDuration || 0;
-        const add = Math.min(duration, targetSeconds - counted);
+        const durationSeconds = Math.max(0, duration);
+        const add = Math.min(durationSeconds, targetSeconds - countedSeconds);
         if (add > 0) {
           perActivity.set(
             session.activityId,
             (perActivity.get(session.activityId) || 0) + add
           );
-          counted += add;
+          countedSeconds += add;
         }
-        pointer = session.sessionStart + duration;
+        pointerSeconds = (session.sessionStart / 1000) + durationSeconds;
       };
 
       daySessions.forEach(session => {
-        consumeGap(session.sessionStart);
+        consumeGapSeconds(session.sessionStart / 1000);
         consumeSession(session);
       });
 
-      if (counted < targetSeconds) {
-        inactivitySeconds += targetSeconds - counted;
-        counted = targetSeconds;
+      if (countedSeconds < targetSeconds) {
+        inactivitySeconds += targetSeconds - countedSeconds;
+        countedSeconds = targetSeconds;
       }
 
       days.push({
