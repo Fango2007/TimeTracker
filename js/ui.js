@@ -63,6 +63,8 @@
     statsTableBody: $('#stats-table-body'),
     statsPrev: $('#stats-prev'),
     statsNext: $('#stats-next'),
+    statsMin: $('#stats-min'),
+    statsMax: $('#stats-max'),
     // Settings
     settingsForm: $('#settings-form'),
     settingsError: $('#settings-error'),
@@ -711,6 +713,10 @@
       }
     });
 
+    const mins = statsData.data.length ? Math.min(...statsData.data) : 0;
+    const maxs = statsData.data.length ? Math.max(...statsData.data) : 0;
+    elements.statsMin.text(`${mins}m`);
+    elements.statsMax.text(`${maxs}m`);
     elements.statsPrev.prop('disabled', !statsData.hasPrev);
     elements.statsNext.prop('disabled', !statsData.hasNext);
     renderStatsTable();
