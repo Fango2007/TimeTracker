@@ -4,7 +4,30 @@
   const LOGS_KEY = 'logs';
   const USER_CONFIG_KEY = 'userConfig';
 
-  const { safeParseJSON, deepClone } = window.TimeWiseUtils;
+  const {
+    safeParseJSON,
+    deepClone,
+    isValidCategory,
+    isValidPriority,
+    isValidCognitiveLoad,
+    WEEKDAYS
+  } = window.TimeWiseUtils;
+
+  const DEFAULT_USER_CONFIG = {
+    soundEnabled: true,
+    defaultSessionMaxMinutes: null,
+    defaultDailyMaxMinutes: null,
+    dailyWorkTargets: {
+      monday: 7,
+      tuesday: 7,
+      wednesday: 7,
+      thursday: 7,
+      friday: 7,
+      saturday: 3,
+      sunday: 0
+    },
+    weekStart: 'monday'
+  };
 
   const readArray = (key) => {
     const raw = localStorage.getItem(key);
@@ -32,14 +55,63 @@
   const getSessions = () => deepClone(readArray(LOGS_KEY));
   const saveSessions = (sessions) => writeArray(LOGS_KEY, sessions);
 
-  const getUserConfig = () => deepClone(readObject(USER_CONFIG_KEY));
-  const saveUserConfig = (config) => writeObject(USER_CONFIG_KEY, config);
+  const coerceMinutes = (value, fieldName, strict = false) => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num < 0) {
+      if (strict) throw new Error(`Invalid value for ${fieldName}`);
+      return null;
+    }
+    return num;
+  };
 
-  const exportAll = () => ({
-    activities: getActivities(),
-    logs: getSessions(),
-    userConfig: getUserConfig()
-  });
+  const sanitizeDailyTargets = (targets = {}, strict = false) => {
+    const safeTargets = { ...DEFAULT_USER_CONFIG.dailyWorkTargets };
+    WEEKDAYS.forEach(day => {
+      const candidate = targets[day];
+      const num = Number(candidate);
+      if (Number.isFinite(num) && num >= 0) {
+        safeTargets[day] = num;
+      } else if (strict && candidate !== undefined) {
+        throw new Error(`Invalid daily target for ${day}`);
+      }
+    });
+    return safeTargets;
+  };
+
+  const sanitizeUserConfig = (config = {}, options = {}) => {
+    const { strict = false } = options;
+    const base = { ...DEFAULT_USER_CONFIG, ...(config && typeof config === 'object' ? config : {}) };
+    return {
+      soundEnabled: base.soundEnabled !== false,
+      defaultSessionMaxMinutes: coerceMinutes(
+        base.defaultSessionMaxMinutes,
+        'defaultSessionMaxMinutes',
+        strict
+      ),
+      defaultDailyMaxMinutes: coerceMinutes(
+        base.defaultDailyMaxMinutes,
+        'defaultDailyMaxMinutes',
+        strict
+      ),
+      dailyWorkTargets: sanitizeDailyTargets(base.dailyWorkTargets, strict),
+      weekStart: base.weekStart === 'sunday' ? 'sunday' : 'monday'
+    };
+  };
+
+  const getUserConfig = () => sanitizeUserConfig(readObject(USER_CONFIG_KEY));
+  const saveUserConfig = (config) =>
+    writeObject(USER_CONFIG_KEY, sanitizeUserConfig(config, { strict: true }));
+
+  const exportAll = () => {
+    const sessions = getSessions();
+    return {
+      activities: getActivities(),
+      logs: sessions,
+      sessions,
+      userConfig: getUserConfig()
+    };
+  };
 
   const importAll = (payload) => {
     if (!payload || typeof payload !== 'object') {
@@ -47,21 +119,30 @@
     }
     const activities = payload.activities || [];
     const sessions = payload.logs || payload.sessions || [];
-    const userConfig = payload.userConfig || {};
     if (!Array.isArray(activities) || !Array.isArray(sessions)) {
       throw new Error('Activities and sessions must be arrays');
     }
+    const activityIds = new Set();
+    const activityLabels = new Set();
     activities.forEach(act => {
       if (
         !act ||
         typeof act.id !== 'string' ||
         !act.label ||
         typeof act.label !== 'string' ||
-        !window.TimeWiseUtils.isValidCategory(act.category) ||
-        !window.TimeWiseUtils.isValidPriority(act.priority) ||
-        !window.TimeWiseUtils.isValidCognitiveLoad(act.cognitiveLoad)
+        act.label.length > 120 ||
+        !isValidCategory(act.category) ||
+        !isValidPriority(act.priority) ||
+        !isValidCognitiveLoad(act.cognitiveLoad)
       ) {
         throw new Error('Invalid activity schema');
+      }
+      const normalizedLabel = act.label.trim().toLowerCase();
+      if (activityLabels.has(normalizedLabel)) {
+        throw new Error('Duplicate activity labels detected');
+      }
+      if (activityIds.has(act.id)) {
+        throw new Error('Duplicate activity ids detected');
       }
       if (
         act.dailyMax !== null &&
@@ -77,32 +158,58 @@
       ) {
         throw new Error('Invalid activity sessionMax');
       }
+      activityIds.add(act.id);
+      activityLabels.add(normalizedLabel);
     });
     sessions.forEach(session => {
       if (
         !session ||
         typeof session.id !== 'string' ||
         typeof session.activityId !== 'string' ||
-        typeof session.sessionStart !== 'number'
+        typeof session.sessionStart !== 'number' ||
+        typeof session.sessionEnd !== 'number'
       ) {
         throw new Error('Invalid session schema');
+      }
+      if (!activityIds.has(session.activityId)) {
+        throw new Error('Session references unknown activity');
       }
       if (!Array.isArray(session.intervals)) {
         throw new Error('Session intervals must be an array');
       }
+      let totalIntervals = 0;
+      let lastEnd = null;
       session.intervals.forEach(interval => {
         if (
           typeof interval.start !== 'number' ||
-          typeof interval.end !== 'number' ||
+          (interval.end !== null && typeof interval.end !== 'number') ||
           typeof interval.duration !== 'number'
         ) {
           throw new Error('Invalid interval schema');
         }
+        if (interval.end !== null && interval.end < interval.start) {
+          throw new Error('Interval end before start');
+        }
+        if (interval.end !== null) {
+          const expected = Math.round((interval.end - interval.start) / 1000);
+          if (Math.abs(expected - interval.duration) > 1) {
+            throw new Error('Interval duration mismatch');
+          }
+        }
+        if (lastEnd !== null && interval.start < lastEnd) {
+          throw new Error('Intervals must be chronological and non-overlapping');
+        }
+        lastEnd = interval.end ?? interval.start;
+        totalIntervals += interval.duration || 0;
       });
+      if (Math.abs(totalIntervals - (session.totalDuration || 0)) > 1) {
+        throw new Error('Session totalDuration mismatch');
+      }
     });
+    const userConfig = sanitizeUserConfig(payload.userConfig || {}, { strict: true });
     saveActivities(activities);
     saveSessions(sessions);
-    saveUserConfig(userConfig && typeof userConfig === 'object' ? userConfig : {});
+    saveUserConfig(userConfig);
   };
 
   window.TimeWiseStorage = {

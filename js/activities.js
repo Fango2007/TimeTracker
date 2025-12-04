@@ -6,7 +6,7 @@
     isValidCognitiveLoad,
     isValidCategory
   } = window.TimeWiseUtils;
-  const { getActivities, saveActivities, getSessions } = window.TimeWiseStorage;
+  const { getActivities, saveActivities, getSessions, getUserConfig } = window.TimeWiseStorage;
 
   const normalizeLabel = label => label.trim();
 
@@ -19,6 +19,7 @@
 
   const validateActivity = ({ label, category, priority, cognitiveLoad }) => {
     if (!label || !label.trim()) return 'Label is required';
+    if (label.trim().length > 120) return 'Label is too long';
     if (!isValidCategory(category)) return 'Invalid category';
     if (!isValidPriority(priority)) return 'Invalid priority';
     if (!isValidCognitiveLoad(cognitiveLoad)) return 'Invalid cognitive load';
@@ -32,10 +33,24 @@
 
   const createActivity = payload => {
     const activities = getActivities();
-    const error = validateActivity(payload);
+    const config = getUserConfig();
+    const withDefaults = {
+      ...payload,
+      priority: payload.priority || 'medium',
+      cognitiveLoad: payload.cognitiveLoad || 'moderate',
+      dailyMax:
+        payload.dailyMax === null || payload.dailyMax === ''
+          ? config.defaultDailyMaxMinutes
+          : payload.dailyMax,
+      sessionMax:
+        payload.sessionMax === null || payload.sessionMax === ''
+          ? config.defaultSessionMaxMinutes
+          : payload.sessionMax
+    };
+    const error = validateActivity(withDefaults);
     if (error) return { error };
 
-    const label = normalizeLabel(payload.label);
+    const label = normalizeLabel(withDefaults.label);
     if (labelExists(activities, label)) {
       return { error: 'Activity label must be unique' };
     }
@@ -43,17 +58,17 @@
     const newActivity = {
       id: generateId(),
       label,
-      category: payload.category,
-      priority: payload.priority,
-      cognitiveLoad: payload.cognitiveLoad,
+      category: withDefaults.category,
+      priority: withDefaults.priority,
+      cognitiveLoad: withDefaults.cognitiveLoad,
       dailyMax:
-        payload.dailyMax === null || payload.dailyMax === ''
+        withDefaults.dailyMax === null || withDefaults.dailyMax === ''
           ? null
-          : Number(payload.dailyMax),
+          : Number(withDefaults.dailyMax),
       sessionMax:
-        payload.sessionMax === null || payload.sessionMax === ''
+        withDefaults.sessionMax === null || withDefaults.sessionMax === ''
           ? null
-          : Number(payload.sessionMax),
+          : Number(withDefaults.sessionMax),
       archived: false
     };
     activities.push(newActivity);
