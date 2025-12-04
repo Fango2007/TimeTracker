@@ -228,8 +228,13 @@
                 <input type="radio" name="stats-period" autocomplete="off"> Monthly
               </label>
             </div>
+            <div>
+              <button class="btn btn-sm btn-outline-secondary mr-1" id="stats-prev">&larr; Older</button>
+              <button class="btn btn-sm btn-outline-secondary" id="stats-next">Newer &rarr;</button>
+            </div>
           </div>
           <canvas id="statsChart" height="120"></canvas>
+          <div class="small text-muted mt-2">Selected: <span id="stats-selected-label">—</span></div>
           <div class="table-responsive mt-3">
             <table class="table table-sm">
               <thead>
