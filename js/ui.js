@@ -31,6 +31,7 @@
   let statsData = null;
   let statsSelectedIndex = 0;
   let statsOffset = 0;
+  let lastStatsHash = null;
 
   const elements = {
     navLinks: $('[data-view-target]'),
@@ -663,7 +664,22 @@
     elements.statsTabs.removeClass('active');
     elements.statsTabs.filter(`[data-stats-period="${period}"]`).addClass('active');
 
-    statsData = Stats.getStats(period, statsOffset);
+    const incoming = Stats.getStats(period, statsOffset);
+    const hash = JSON.stringify({
+      period,
+      offset: statsOffset,
+      labels: incoming.labels,
+      data: incoming.data
+    });
+    if (hash === lastStatsHash && statsData) {
+      // No change; just ensure controls reflect current selection
+      elements.statsPrev.prop('disabled', !statsData.hasPrev);
+      elements.statsNext.prop('disabled', !statsData.hasNext);
+      renderStatsTable();
+      return;
+    }
+    lastStatsHash = hash;
+    statsData = incoming;
     statsSelectedIndex = Math.max(0, statsData.labels.length - 1);
 
     const ctx = document.getElementById('statsChart').getContext('2d');
