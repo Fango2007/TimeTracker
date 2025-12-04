@@ -84,6 +84,14 @@ const startOfMonth = date => {
   return d;
 };
 
+const getWeekdayKey = date => {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday
+  // Align to WEEKDAYS ordering (Monday first)
+  const idx = day === 0 ? 6 : day - 1;
+  return WEEKDAYS[idx];
+};
+
 const isValidPriority = value => PRIORITIES.includes(value);
 const isValidCognitiveLoad = value => COGNITIVE_LOADS.includes(value);
 const isValidCategory = value => CATEGORIES.includes(value);
@@ -105,6 +113,7 @@ window.TimeWiseUtils = {
   getDateKey,
   startOfWeek,
   startOfMonth,
+  getWeekdayKey,
   isValidPriority,
   isValidCognitiveLoad,
   isValidCategory,

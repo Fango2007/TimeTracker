@@ -28,6 +28,21 @@ body {
   margin-right: 4px;
 }
 
+.priority-list .list-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.priority-list .list-group-item.active {
+  background: #e8f2ff;
+}
+
+.activity-meta {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
 .drag-handle {
   cursor: grab;
 }
