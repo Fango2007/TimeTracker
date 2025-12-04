@@ -6,7 +6,9 @@
     PRIORITIES,
     COGNITIVE_LOADS,
     CATEGORIES,
-    WEEKDAYS
+    WEEKDAYS,
+    getDateKey,
+    getWeekdayKey
   } = window.TimeWiseUtils;
   const {
     getActivities,
@@ -30,11 +32,12 @@
   const elements = {
     navLinks: $('[data-view-target]'),
     views: $('.view-section'),
-    activityList: $('#activity-list'),
-    activityFilters: {
-      category: $('#filter-category'),
-      priority: $('#filter-priority'),
-      cognitive: $('#filter-cognitive')
+    dashboardHighList: $('#dashboard-high-list'),
+    dashboardTarget: $('#dashboard-target'),
+    priorityLists: {
+      high: $('#list-high'),
+      medium: $('#list-medium'),
+      low: $('#list-low')
     },
     startBtn: $('#btn-start'),
     pauseBtn: $('#btn-pause'),
@@ -43,6 +46,7 @@
     resetBtn: $('#btn-reset'),
     timerDisplay: $('#timer-display'),
     currentActivityLabel: $('#current-activity-label'),
+    currentActivityBadges: $('#current-activity-badges'),
     sessionMaxBar: $('#session-max-bar'),
     sessionMaxText: $('#session-max-text'),
     dailyMaxBar: $('#daily-max-bar'),
@@ -85,31 +89,23 @@
       .addClass('active');
   };
 
-  const renderActivityOptions = () => {
-    const activities = getActivities();
-    const filterCategory = elements.activityFilters.category.val();
-    const filterPriority = elements.activityFilters.priority.val();
-    const filterCognitive = elements.activityFilters.cognitive.val();
-    const filtered = activities.filter(act => {
-      if (act.archived) return false;
-      if (filterCategory && filterCategory !== 'all' && act.category !== filterCategory)
-        return false;
-      if (filterPriority && filterPriority !== 'all' && act.priority !== filterPriority)
-        return false;
-      if (filterCognitive && filterCognitive !== 'all' && act.cognitiveLoad !== filterCognitive)
-        return false;
-      return true;
-    });
-
-    if (!selectedActivityId && filtered.length) {
-      selectedActivityId = filtered[0].id;
+  const renderPriorityLists = () => {
+    const activities = getActivities().filter(a => !a.archived);
+    if (!selectedActivityId && activities.length) {
+      selectedActivityId = activities[0].id;
     }
+    const buckets = {
+      high: activities.filter(a => a.priority === 'high'),
+      medium: activities.filter(a => a.priority === 'medium'),
+      low: activities.filter(a => a.priority === 'low')
+    };
 
-    elements.activityList.empty();
-    filtered.forEach(act => {
+    const buildItem = act => {
+      const daily = formatMinutesLabel(act.dailyMax);
+      const session = formatMinutesLabel(act.sessionMax);
       const item = $(`
-        <li class="list-group-item d-flex align-items-center justify-content-between activity-item" data-id="${act.id}">
-          <div class="d-flex align-items-center flex-wrap">
+        <li class="list-group-item activity-item" data-id="${act.id}">
+          <div class="d-flex align-items-center">
             <span class="drag-handle mr-2"><i class="fas fa-grip-lines"></i></span>
             <div>
               <div class="font-weight-bold">${act.label}</div>
@@ -118,14 +114,13 @@
                 <span class="badge badge-${priorityColor(act.priority)} text-uppercase">${act.priority}</span>
                 <span class="badge badge-light text-uppercase">${act.cognitiveLoad}</span>
               </div>
+              <div class="activity-meta">Daily ${daily} • Session ${session}</div>
             </div>
           </div>
           <button class="btn btn-sm btn-primary start-from-list">Start</button>
         </li>
       `);
-      if (selectedActivityId === act.id) {
-        item.addClass('active');
-      }
+      if (selectedActivityId === act.id) item.addClass('active');
       item.on('click', e => {
         if ($(e.target).hasClass('start-from-list') || $(e.target).closest('.start-from-list').length) {
           handleStartFromList(act.id);
@@ -133,25 +128,46 @@
         }
         selectedActivityId = act.id;
         highlightSelected();
+        updateTimerPanel();
       });
-      item.find('.start-from-list').on('click', e => {
-        e.stopPropagation();
+      item.find('.start-from-list').on('click', e => e.stopPropagation());
+      return item;
+    };
+
+    Object.entries(elements.priorityLists).forEach(([priority, $list]) => {
+      $list.empty();
+      buckets[priority].forEach(act => {
+        $list.append(buildItem(act));
       });
-      elements.activityList.append(item);
     });
 
-    if (elements.activityList.data('ui-sortable')) {
-      elements.activityList.sortable('destroy');
-    }
-
-    $('#activity-list').sortable({
+    // sortable across lists
+    $('.priority-list').each(function () {
+      if ($(this).data('ui-sortable')) {
+        $(this).sortable('destroy');
+      }
+    });
+    $('.priority-list').sortable({
+      connectWith: '.priority-list',
       handle: '.drag-handle',
       update: () => {
-        const orderedIds = $('#activity-list')
-          .children()
-          .map((_, el) => $(el).data('id'))
-          .get();
-        Activities.reorderActivities(orderedIds);
+        const priorityBuckets = {
+          high: elements.priorityLists.high
+            .children()
+            .map((_, el) => $(el).data('id'))
+            .get(),
+          medium: elements.priorityLists.medium
+            .children()
+            .map((_, el) => $(el).data('id'))
+            .get(),
+          low: elements.priorityLists.low
+            .children()
+            .map((_, el) => $(el).data('id'))
+            .get()
+        };
+        Activities.reorderAndReprioritize(priorityBuckets);
+        renderPriorityLists();
+        renderDashboard();
       }
     });
 
@@ -159,18 +175,82 @@
   };
 
   const highlightSelected = () => {
-    elements.activityList
-      .children()
-      .removeClass('active');
-    elements.activityList
-      .children(`[data-id="${selectedActivityId}"]`)
-      .addClass('active');
+    Object.values(elements.priorityLists).forEach($list => {
+      $list.children().removeClass('active');
+      $list.children(`[data-id="${selectedActivityId}"]`).addClass('active');
+    });
   };
 
   const priorityColor = priority => {
     if (priority === 'high') return 'danger';
     if (priority === 'medium') return 'warning';
     return 'success';
+  };
+
+  const getTodayTargetSeconds = () => {
+    const config = getUserConfig();
+    const weekdayKey = getWeekdayKey(new Date());
+    const hours = config.dailyWorkTargets?.[weekdayKey] || 0;
+    return Math.max(0, hours * 3600);
+  };
+
+  const getTodayActivitySeconds = activityId => {
+    const todayKey = getDateKey(Date.now());
+    const sessions = getSessions().filter(
+      s => getDateKey(s.sessionStart) === todayKey && (!activityId || s.activityId === activityId)
+    );
+    const pastSeconds = sessions.reduce(
+      (acc, s) => acc + Math.max(0, s.totalDuration || 0),
+      0
+    );
+    const state = Timer.getState();
+    const current = state.currentSession;
+    const currentMatches =
+      current &&
+      getDateKey(current.sessionStart) === todayKey &&
+      (!activityId || current.activityId === activityId);
+    const runningSeconds = currentMatches ? state.elapsedSeconds : 0;
+    return pastSeconds + runningSeconds;
+  };
+
+  const renderDashboard = () => {
+    const activities = getActivities().filter(a => !a.archived && a.priority === 'high');
+    const todayTargetSeconds = getTodayTargetSeconds();
+    const todayTotalSeconds = getTodayActivitySeconds(null);
+    const sorted = activities
+      .map(act => ({
+        ...act,
+        todaySeconds: getTodayActivitySeconds(act.id)
+      }))
+      .sort((a, b) => a.todaySeconds - b.todaySeconds);
+
+    elements.dashboardHighList.empty();
+    if (!sorted.length) {
+      elements.dashboardHighList.append(
+        '<li class="list-group-item text-muted small">No high-priority activities</li>'
+      );
+    } else {
+      sorted.forEach(act => {
+        elements.dashboardHighList.append(`
+          <li class="list-group-item d-flex justify-content-between">
+            <span>${act.label}</span>
+            <span>${formatMinutesLabel(Math.round(act.todaySeconds / 60))}</span>
+          </li>
+        `);
+      });
+    }
+
+    const trackedLabel = formatMinutesLabel(Math.round(todayTotalSeconds / 60));
+    if (todayTargetSeconds > 0) {
+      const targetLabel = formatMinutesLabel(Math.round(todayTargetSeconds / 60));
+      const percent = Math.min(
+        999,
+        Math.round((todayTotalSeconds / todayTargetSeconds) * 100)
+      );
+      elements.dashboardTarget.text(`Today: ${trackedLabel} / Target: ${targetLabel} (${percent}%)`);
+    } else {
+      elements.dashboardTarget.text(`Today: ${trackedLabel}`);
+    }
   };
 
   const renderActivitiesTable = () => {
@@ -292,9 +372,20 @@
     const activityLabel = currentActivity?.label || 'No active session';
     elements.timerDisplay.text(formatDuration(state.elapsedSeconds));
     elements.currentActivityLabel.text(activityLabel);
-
     const activityId = currentActivity?.id || selectedActivityId;
     const activity = activities.find(a => a.id === activityId);
+    elements.currentActivityBadges.empty();
+    if (activity) {
+      elements.currentActivityBadges.append(
+        `<span class="badge badge-info text-uppercase mr-1">${activity.category}</span>`
+      );
+      elements.currentActivityBadges.append(
+        `<span class="badge badge-${priorityColor(activity.priority)} text-uppercase mr-1">${activity.priority}</span>`
+      );
+      elements.currentActivityBadges.append(
+        `<span class="badge badge-light text-uppercase">${activity.cognitiveLoad}</span>`
+      );
+    }
     updateProgressBars(activity, state.elapsedSeconds);
 
     elements.startBtn.prop('disabled', !activityId || !!state.currentSession);
@@ -364,12 +455,16 @@
     if (type === 'stop' || type === 'reset') {
       refreshAll();
     }
+    if (type === 'tick') {
+      renderDashboard();
+    }
     updateTimerPanel();
   };
 
   const refreshAll = () => {
     refreshUserConfig();
-    renderActivityOptions();
+    renderPriorityLists();
+    renderDashboard();
     renderActivitiesTable();
     renderHistory();
     renderStats(statsPeriod);
@@ -390,12 +485,6 @@
       if (target === 'settings-view') {
         renderSettingsForm();
       }
-    });
-  };
-
-  const bindFilters = () => {
-    Object.values(elements.activityFilters).forEach($el => {
-      $el.on('change', renderActivityOptions);
     });
   };
 
@@ -657,23 +746,8 @@
     });
   };
 
-  const initFiltersOptions = () => {
-    const buildOptions = (values, $select, label) => {
-      $select.empty();
-      $select.append(`<option value="all">All ${label}</option>`);
-      values.forEach(val => {
-        $select.append(`<option value="${val}">${val}</option>`);
-      });
-    };
-    buildOptions(CATEGORIES, elements.activityFilters.category, 'Categories');
-    buildOptions(PRIORITIES, elements.activityFilters.priority, 'Priorities');
-    buildOptions(COGNITIVE_LOADS, elements.activityFilters.cognitive, 'Loads');
-  };
-
   const init = () => {
-    initFiltersOptions();
     bindNav();
-    bindFilters();
     bindTimerButtons();
     bindActivityForm();
     bindSettingsForm();
@@ -681,7 +755,8 @@
     bindStatsTabs();
     Timer.subscribe(handleTimerEvents);
     resetForm();
-    renderActivityOptions();
+    renderPriorityLists();
+    renderDashboard();
     renderActivitiesTable();
     renderHistory();
     renderStats(statsPeriod);

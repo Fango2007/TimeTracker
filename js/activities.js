@@ -130,6 +130,37 @@
     return reordered;
   };
 
+  const reorderAndReprioritize = priorityBuckets => {
+    const activities = getActivities();
+    const map = new Map(activities.map(a => [a.id, a]));
+    const reordered = [];
+    const seen = new Set();
+    const bucketOrder = ['high', 'medium', 'low'];
+
+    bucketOrder.forEach(bucket => {
+      const ids = priorityBuckets[bucket] || [];
+      ids.forEach(id => {
+        const act = map.get(id);
+        if (!act) return;
+        seen.add(id);
+        const updated = { ...act, priority: bucket };
+        const error = validateActivity(updated);
+        if (error) return;
+        reordered.push(updated);
+      });
+    });
+
+    // append remaining activities (including archived or missing from buckets) preserving original order
+    activities.forEach(act => {
+      if (!seen.has(act.id)) {
+        reordered.push(act);
+      }
+    });
+
+    saveActivities(reordered);
+    return reordered;
+  };
+
   const getActiveActivities = () =>
     getActivities().filter(act => !act.archived);
 
@@ -139,6 +170,7 @@
     archiveActivity,
     deleteActivity,
     reorderActivities,
+    reorderAndReprioritize,
     getActiveActivities,
     hasSessions
   };
