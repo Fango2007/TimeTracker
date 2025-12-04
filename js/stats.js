@@ -44,49 +44,70 @@
       const targetSeconds = Math.max(0, targetHours * 3600);
       const perActivity = new Map();
 
-      let countedSeconds = 0;
-      let inactivitySeconds = 0;
-      let pointerSeconds = cursor.getTime() / 1000;
+      const totalTracked = daySessions.reduce(
+        (acc, s) => acc + Math.max(0, s.totalDuration || 0),
+        0
+      );
 
-      const consumeGapSeconds = nextTsSeconds => {
-        if (countedSeconds >= targetSeconds) return;
-        const gapSeconds = Math.max(0, nextTsSeconds - pointerSeconds);
-        const add = Math.min(gapSeconds, targetSeconds - countedSeconds);
-        inactivitySeconds += add;
-        countedSeconds += add;
-        pointerSeconds = nextTsSeconds;
-      };
+      if (targetSeconds === 0) {
+        // No target: only show tracked time, no inactivity
+        daySessions.forEach(session => {
+          const duration = Math.max(0, session.totalDuration || 0);
+          if (duration > 0) {
+            perActivity.set(
+              session.activityId,
+              (perActivity.get(session.activityId) || 0) + duration
+            );
+          }
+        });
+        days.push({
+          key,
+          label: `${cursor.getMonth() + 1}/${cursor.getDate()}`,
+          date: new Date(cursor),
+          totalTrackedSeconds: totalTracked,
+          inactivitySeconds: 0,
+          perActivity
+        });
+        cursor.setDate(cursor.getDate() + 1);
+        continue;
+      }
 
-      const consumeSession = (session) => {
-        if (countedSeconds >= targetSeconds) return;
-        const duration = session.totalDuration || 0;
-        const durationSeconds = Math.max(0, duration);
-        const add = Math.min(durationSeconds, targetSeconds - countedSeconds);
+      if (daySessions.length === 0) {
+        // No work logged: full target is inactivity
+        days.push({
+          key,
+          label: `${cursor.getMonth() + 1}/${cursor.getDate()}`,
+          date: new Date(cursor),
+          totalTrackedSeconds: 0,
+          inactivitySeconds: targetSeconds,
+          perActivity
+        });
+        cursor.setDate(cursor.getDate() + 1);
+        continue;
+      }
+
+      // Inactivity only changes when a session is saved; cap tracked to target and fill remainder as inactivity.
+      let remaining = targetSeconds;
+      daySessions.forEach(session => {
+        if (remaining <= 0) return;
+        const duration = Math.max(0, session.totalDuration || 0);
+        const add = Math.min(duration, remaining);
         if (add > 0) {
           perActivity.set(
             session.activityId,
             (perActivity.get(session.activityId) || 0) + add
           );
-          countedSeconds += add;
+          remaining -= add;
         }
-        pointerSeconds = (session.sessionStart / 1000) + durationSeconds;
-      };
-
-      daySessions.forEach(session => {
-        consumeGapSeconds(session.sessionStart / 1000);
-        consumeSession(session);
       });
-
-      if (countedSeconds < targetSeconds) {
-        inactivitySeconds += targetSeconds - countedSeconds;
-        countedSeconds = targetSeconds;
-      }
+      const trackedSeconds = Math.min(totalTracked, targetSeconds);
+      const inactivitySeconds = Math.max(0, targetSeconds - trackedSeconds);
 
       days.push({
         key,
         label: `${cursor.getMonth() + 1}/${cursor.getDate()}`,
         date: new Date(cursor),
-        totalTrackedSeconds: Array.from(perActivity.values()).reduce((a, b) => a + b, 0),
+        totalTrackedSeconds: trackedSeconds,
         inactivitySeconds,
         perActivity
       });
