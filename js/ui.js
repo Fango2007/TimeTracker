@@ -39,8 +39,10 @@
   const elements = {
     navLinks: $('[data-view-target]'),
     views: $('.view-section'),
+    dashboardFirstTimer: $('#dashboard-first-timer'),
     dashboardHighList: $('#dashboard-high-list'),
     dashboardTarget: $('#dashboard-target'),
+    dashboardInactivity: $('#dashboard-inactivity'),
     priorityLists: {
       high: $('#list-high'),
       medium: $('#list-medium'),
@@ -205,34 +207,34 @@
     return Math.max(0, hours * 3600);
   };
 
-  const getTodayActivitySeconds = activityId => {
+  const renderDashboard = () => {
     const todayKey = getDateKey(Date.now());
-    const sessions = getSessions().filter(
-      s => getDateKey(s.sessionStart) === todayKey && (!activityId || s.activityId === activityId)
-    );
-    const pastSeconds = sessions.reduce(
+    const snapshot = computeDaySnapshot(todayKey);
+    const firstTimerAt = snapshot.firstTimerAt;
+    if (firstTimerAt) {
+      const d = new Date(firstTimerAt);
+      const hh = d.getHours().toString().padStart(2, '0');
+      const mm = d.getMinutes().toString().padStart(2, '0');
+      elements.dashboardFirstTimer.text(`First timer: ${hh}:${mm}`);
+    } else {
+      elements.dashboardFirstTimer.text('No timer started yet');
+    }
+
+    const sessionsToday = getSessions().filter(s => getDateKey(s.sessionStart) === todayKey);
+    const totalTrackedSeconds = sessionsToday.reduce(
       (acc, s) => acc + Math.max(0, s.totalDuration || 0),
       0
     );
-    const state = Timer.getState();
-    const current = state.currentSession;
-    const currentMatches =
-      current &&
-      getDateKey(current.sessionStart) === todayKey &&
-      (!activityId || current.activityId === activityId);
-    const runningSeconds = currentMatches ? state.elapsedSeconds : 0;
-    return pastSeconds + runningSeconds;
-  };
-
-  const renderDashboard = () => {
     const activities = getActivities().filter(a => !a.archived && a.priority === 'high');
     const todayTargetSeconds = getTodayTargetSeconds();
-    const todayTotalSeconds = getTodayActivitySeconds(null);
+    const activityDurations = activities.map(act => {
+      const seconds = sessionsToday
+        .filter(s => s.activityId === act.id)
+        .reduce((acc, s) => acc + Math.max(0, s.totalDuration || 0), 0);
+      return { ...act, todaySeconds: seconds };
+    });
     const sorted = activities
-      .map(act => ({
-        ...act,
-        todaySeconds: getTodayActivitySeconds(act.id)
-      }))
+      .map(act => activityDurations.find(a => a.id === act.id))
       .sort((a, b) => a.todaySeconds - b.todaySeconds);
 
     elements.dashboardHighList.empty();
@@ -251,17 +253,76 @@
       });
     }
 
-    const trackedLabel = formatMinutesLabel(Math.round(todayTotalSeconds / 60));
+    const trackedLabel = formatMinutesLabel(Math.round(totalTrackedSeconds / 60));
     if (todayTargetSeconds > 0) {
       const targetLabel = formatMinutesLabel(Math.round(todayTargetSeconds / 60));
       const percent = Math.min(
         999,
-        Math.round((todayTotalSeconds / todayTargetSeconds) * 100)
+        Math.round((totalTrackedSeconds / todayTargetSeconds) * 100)
       );
       elements.dashboardTarget.text(`Today: ${trackedLabel} / Target: ${targetLabel} (${percent}%)`);
     } else {
       elements.dashboardTarget.text(`Today: ${trackedLabel}`);
     }
+
+    const allSessions = sessionsToday.slice();
+    const state = Timer.getState();
+    const running = state.currentSession;
+    const runningToday =
+      running && getDateKey(running.sessionStart) === todayKey;
+    if (runningToday) {
+      const runningCopy = {
+        ...running,
+        sessionEnd: Date.now(),
+        intervals: (running.intervals || []).map((interval, idx, arr) => {
+          const isLast = idx === arr.length - 1;
+          if (isLast && (interval.end === null || interval.end === undefined)) {
+            return { ...interval, end: Date.now() };
+          }
+          return interval;
+        })
+      };
+      allSessions.push(runningCopy);
+    }
+    let displayInactivityMs = snapshot.inactivityDurationMs || 0;
+    if (allSessions.length) {
+      const earliestStart = Math.min(
+        ...allSessions.map(s => s.sessionStart)
+      );
+      const dayStartAt =
+        snapshot.firstTimerAt !== null && snapshot.firstTimerAt !== undefined
+          ? snapshot.firstTimerAt
+          : earliestStart;
+      const latestEnd = Math.max(
+        ...allSessions.map(s => (s.sessionEnd ? s.sessionEnd : s.sessionStart))
+      );
+      const dayEndAt =
+        snapshot.dayEndAt !== null && snapshot.dayEndAt !== undefined
+          ? snapshot.dayEndAt
+          : latestEnd;
+      const computeOverlap = (intervals, start, end) => {
+        return intervals.reduce((acc, interval) => {
+          const intervalStart = Number(interval.start);
+          const intervalEnd =
+            interval.end === null || interval.end === undefined
+              ? intervalStart
+              : Number(interval.end);
+          if (!Number.isFinite(intervalStart) || !Number.isFinite(intervalEnd)) return acc;
+          const overlapStart = Math.max(intervalStart, start);
+          const overlapEnd = Math.min(intervalEnd, end);
+          return overlapEnd > overlapStart ? acc + (overlapEnd - overlapStart) : acc;
+        }, 0);
+      };
+      const trackedMs = allSessions.reduce(
+        (acc, session) =>
+          acc + computeOverlap(session.intervals || [], dayStartAt, dayEndAt),
+        0
+      );
+      const workingWindowMs = Math.max(0, dayEndAt - dayStartAt);
+      displayInactivityMs = Math.max(0, workingWindowMs - trackedMs);
+    }
+    const inactivityMinutes = Math.round(displayInactivityMs / 60000);
+    elements.dashboardInactivity.text(`Inactivity: ${formatMinutesLabel(inactivityMinutes)}`);
   };
 
   const renderActivitiesTable = () => {
@@ -463,11 +524,23 @@
     if (type === 'auto-stop') {
       alert('Session reached its maximum duration and was stopped automatically.');
     }
+    if (type === 'start') {
+      const state = Timer.getState();
+      const current = state.currentSession;
+      const todayKey = getDateKey(Date.now());
+      if (current && getDateKey(current.sessionStart) === todayKey) {
+        const snapshots = getDaySnapshots();
+        const snapshot = snapshots[todayKey] || getOrCreateDaySnapshot(todayKey);
+        if (snapshot.firstTimerAt === null || snapshot.firstTimerAt === undefined) {
+          snapshot.firstTimerAt = current.sessionStart;
+          snapshots[todayKey] = snapshot;
+          saveDaySnapshots(snapshots);
+        }
+      }
+      renderDashboard();
+    }
     if (type === 'stop' || type === 'reset') {
       refreshAll();
-    }
-    if (type === 'tick') {
-      renderDashboard();
     }
     updateTimerPanel();
   };

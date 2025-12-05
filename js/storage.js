@@ -148,7 +148,11 @@
     if (!sessions.length) {
       return deepClone(baseSnapshot);
     }
-    const dayStartAt = Math.min(...sessions.map(s => s.sessionStart));
+    const earliestSessionStart = Math.min(...sessions.map(s => s.sessionStart));
+    const dayStartAt =
+      baseSnapshot.firstTimerAt !== null && baseSnapshot.firstTimerAt !== undefined
+        ? baseSnapshot.firstTimerAt
+        : earliestSessionStart;
     const latestSessionEnd = Math.max(
       ...sessions.map(s => (s.sessionEnd ? s.sessionEnd : s.sessionStart))
     );
