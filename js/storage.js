@@ -3,6 +3,7 @@
   const ACTIVITIES_KEY = 'activities';
   const LOGS_KEY = 'logs';
   const USER_CONFIG_KEY = 'userConfig';
+  const DAY_SNAPSHOTS_KEY = 'daySnapshots';
 
   const {
     safeParseJSON,
@@ -54,6 +55,64 @@
 
   const getSessions = () => deepClone(readArray(LOGS_KEY));
   const saveSessions = (sessions) => writeArray(LOGS_KEY, sessions);
+
+  const createEmptySnapshot = (date) => ({
+    date,
+    firstTimerAt: null,
+    dayEndAt: null
+  });
+
+  const sanitizeSnapshot = (date, snapshot) => {
+    const safe = createEmptySnapshot(date);
+    if (snapshot && typeof snapshot === 'object') {
+      const first = snapshot.firstTimerAt;
+      const end = snapshot.dayEndAt;
+      const inactivity = snapshot.inactivityDurationMs;
+      if (Number.isFinite(first)) {
+        safe.firstTimerAt = first;
+      }
+      if (Number.isFinite(end)) {
+        safe.dayEndAt = end;
+      }
+      if (Number.isFinite(inactivity) && inactivity >= 0) {
+        safe.inactivityDurationMs = inactivity;
+      }
+    }
+    return safe;
+  };
+
+  const getDaySnapshots = () => {
+    const raw = readObject(DAY_SNAPSHOTS_KEY);
+    const result = {};
+    Object.keys(raw).forEach(date => {
+      result[date] = sanitizeSnapshot(date, raw[date]);
+    });
+    return deepClone(result);
+  };
+
+  const saveDaySnapshots = (snapshots) => {
+    const safe = {};
+    if (snapshots && typeof snapshots === 'object') {
+      Object.keys(snapshots).forEach(date => {
+        safe[date] = sanitizeSnapshot(date, snapshots[date]);
+      });
+    }
+    writeObject(DAY_SNAPSHOTS_KEY, safe);
+  };
+
+  const getOrCreateDaySnapshot = (date) => {
+    if (!date || typeof date !== 'string') {
+      throw new Error('A date key (YYYY-MM-DD) is required');
+    }
+    const snapshots = getDaySnapshots();
+    if (snapshots[date]) {
+      return deepClone(snapshots[date]);
+    }
+    const fresh = createEmptySnapshot(date);
+    snapshots[date] = fresh;
+    saveDaySnapshots(snapshots);
+    return deepClone(fresh);
+  };
 
   const coerceMinutes = (value, fieldName, strict = false) => {
     if (value === null || value === undefined || value === '') return null;
@@ -219,8 +278,11 @@
     saveSessions,
     getUserConfig,
     saveUserConfig,
+    getDaySnapshots,
+    saveDaySnapshots,
+    getOrCreateDaySnapshot,
     exportAll,
     importAll,
-    keys: { ACTIVITIES_KEY, LOGS_KEY, USER_CONFIG_KEY }
+    keys: { ACTIVITIES_KEY, LOGS_KEY, USER_CONFIG_KEY, DAY_SNAPSHOTS_KEY }
   };
 })();
