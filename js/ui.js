@@ -16,7 +16,11 @@
     importAll,
     getSessions,
     getUserConfig,
-    saveUserConfig
+    saveUserConfig,
+    getDaySnapshots,
+    saveDaySnapshots,
+    getOrCreateDaySnapshot,
+    computeDaySnapshot
   } = window.TimeWiseStorage;
   const Activities = window.TimeWiseActivities;
   const Timer = window.TimeWiseTimer;
@@ -47,6 +51,7 @@
     resumeBtn: $('#btn-resume'),
     stopBtn: $('#btn-stop'),
     resetBtn: $('#btn-reset'),
+    closeDayBtn: $('#btn-close-day'),
     timerDisplay: $('#timer-display'),
     currentActivityLabel: $('#current-activity-label'),
     currentActivityBadges: $('#current-activity-badges'),
@@ -92,6 +97,7 @@
     elements.navLinks
       .filter(`[data-view-target="${target}"]`)
       .addClass('active');
+    elements.closeDayBtn.toggleClass('d-none', target !== 'timer-view');
   };
 
   const renderPriorityLists = () => {
@@ -501,6 +507,31 @@
     elements.resetBtn.on('click', resetTimer);
   };
 
+  const handleCloseDay = () => {
+    const todayKey = getDateKey(Date.now());
+    const sessions = getSessions().filter(
+      s => getDateKey(s.sessionStart) === todayKey
+    );
+    if (!sessions.length) {
+      alert('No tracked time for today, nothing to close.');
+      return;
+    }
+    const snapshots = getDaySnapshots();
+    const snapshot = snapshots[todayKey] || getOrCreateDaySnapshot(todayKey);
+    const earliestStart = Math.min(...sessions.map(s => s.sessionStart));
+    if (snapshot.firstTimerAt === null || snapshot.firstTimerAt === undefined) {
+      snapshot.firstTimerAt = earliestStart;
+    }
+    snapshot.dayEndAt = Date.now();
+    snapshots[todayKey] = snapshot;
+    saveDaySnapshots(snapshots);
+    computeDaySnapshot(todayKey);
+    renderDashboard();
+    if ($('#statistics').hasClass('active')) {
+      renderStats(statsPeriod);
+    }
+  };
+
   const bindActivityForm = () => {
     elements.activityForm.on('submit', e => {
       e.preventDefault();
@@ -810,6 +841,7 @@
   const init = () => {
     bindNav();
     bindTimerButtons();
+    elements.closeDayBtn.on('click', handleCloseDay);
     bindActivityForm();
     bindSettingsForm();
     bindImportExport();
@@ -823,6 +855,10 @@
     renderStats(statsPeriod, true);
     renderSettingsForm();
     updateTimerPanel();
+    elements.closeDayBtn.toggleClass(
+      'd-none',
+      !$('#timer-view').hasClass('active')
+    );
   };
 
   $(document).ready(init);
