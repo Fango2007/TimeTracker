@@ -11,6 +11,7 @@
     isValidCategory,
     isValidPriority,
     isValidCognitiveLoad,
+    getDateKey,
     WEEKDAYS
   } = window.TimeWiseUtils;
 
@@ -113,6 +114,67 @@
     saveDaySnapshots(snapshots);
     return deepClone(fresh);
   };
+
+  const computeTrackedSpan = (sessions, dayStartAt, dayEndAt) => {
+    if (dayStartAt === null || dayEndAt === null || dayEndAt <= dayStartAt) return 0;
+    let totalMs = 0;
+    sessions.forEach(session => {
+      (session.intervals || []).forEach(interval => {
+        const intervalStart = Number(interval.start);
+        const intervalEnd =
+          interval.end === null || interval.end === undefined
+            ? intervalStart
+            : Number(interval.end);
+        if (!Number.isFinite(intervalStart) || !Number.isFinite(intervalEnd)) return;
+        const overlapStart = Math.max(intervalStart, dayStartAt);
+        const overlapEnd = Math.min(intervalEnd, dayEndAt);
+        if (overlapEnd > overlapStart) {
+          totalMs += overlapEnd - overlapStart;
+        }
+      });
+    });
+    return totalMs;
+  };
+
+  const computeDaySnapshot = (date) => {
+    if (!date || typeof date !== 'string') {
+      throw new Error('A date key (YYYY-MM-DD) is required');
+    }
+    const snapshots = getDaySnapshots();
+    const baseSnapshot = sanitizeSnapshot(date, snapshots[date]);
+    const sessions = getSessions().filter(
+      session => getDateKey(session.sessionStart) === date
+    );
+    if (!sessions.length) {
+      return deepClone(baseSnapshot);
+    }
+    const dayStartAt = Math.min(...sessions.map(s => s.sessionStart));
+    const latestSessionEnd = Math.max(
+      ...sessions.map(s => (s.sessionEnd ? s.sessionEnd : s.sessionStart))
+    );
+    const dayEndAt =
+      baseSnapshot.dayEndAt !== null && baseSnapshot.dayEndAt !== undefined
+        ? baseSnapshot.dayEndAt
+        : latestSessionEnd;
+    const workingWindow = Math.max(0, dayEndAt - dayStartAt);
+    const trackedSpan = computeTrackedSpan(sessions, dayStartAt, dayEndAt);
+    const inactivityDurationMs = Math.max(0, workingWindow - trackedSpan);
+
+    const nextSnapshot = {
+      ...baseSnapshot,
+      date,
+      firstTimerAt: baseSnapshot.firstTimerAt !== null ? baseSnapshot.firstTimerAt : dayStartAt,
+      dayEndAt,
+      inactivityDurationMs
+    };
+    snapshots[date] = nextSnapshot;
+    saveDaySnapshots(snapshots);
+    return deepClone(nextSnapshot);
+  };
+
+  const getDaySnapshot = (date) => computeDaySnapshot(date);
+
+  const recomputeDaySnapshot = (date) => computeDaySnapshot(date);
 
   const coerceMinutes = (value, fieldName, strict = false) => {
     if (value === null || value === undefined || value === '') return null;
@@ -281,6 +343,9 @@
     getDaySnapshots,
     saveDaySnapshots,
     getOrCreateDaySnapshot,
+    computeDaySnapshot,
+    getDaySnapshot,
+    recomputeDaySnapshot,
     exportAll,
     importAll,
     keys: { ACTIVITIES_KEY, LOGS_KEY, USER_CONFIG_KEY, DAY_SNAPSHOTS_KEY }
