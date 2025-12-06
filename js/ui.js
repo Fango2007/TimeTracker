@@ -301,7 +301,7 @@
       );
       const dayEndAt =
         snapshot.dayEndAt !== null && snapshot.dayEndAt !== undefined
-          ? snapshot.dayEndAt
+          ? Math.max(snapshot.dayEndAt, latestEnd)
           : latestEnd;
       const computeOverlap = (intervals, start, end) => {
         return intervals.reduce((acc, interval) => {
@@ -540,11 +540,16 @@
         const snapshot = snapshots[todayKey] || getOrCreateDaySnapshot(todayKey);
         if (snapshot.firstTimerAt === null || snapshot.firstTimerAt === undefined) {
           snapshot.firstTimerAt = current.sessionStart;
-          snapshots[todayKey] = snapshot;
-          saveDaySnapshots(snapshots);
         }
+        snapshot.dayEndAt = Math.max(snapshot.dayEndAt || 0, Date.now());
+        snapshots[todayKey] = snapshot;
+        saveDaySnapshots(snapshots);
+        computeDaySnapshot(todayKey);
       }
       renderDashboard();
+      if ($('#statistics').hasClass('active')) {
+        renderStats(statsPeriod);
+      }
     }
     if (type === 'stop' || type === 'reset') {
       refreshAll();

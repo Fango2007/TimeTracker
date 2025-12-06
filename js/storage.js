@@ -158,7 +158,7 @@
     );
     const dayEndAt =
       baseSnapshot.dayEndAt !== null && baseSnapshot.dayEndAt !== undefined
-        ? baseSnapshot.dayEndAt
+        ? Math.max(baseSnapshot.dayEndAt, latestSessionEnd)
         : latestSessionEnd;
     const workingWindow = Math.max(0, dayEndAt - dayStartAt);
     const trackedSpan = computeTrackedSpan(sessions, dayStartAt, dayEndAt);
