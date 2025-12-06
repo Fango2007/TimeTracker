@@ -143,7 +143,10 @@
         highlightSelected();
         updateTimerPanel();
       });
-      item.find('.start-from-list').on('click', e => e.stopPropagation());
+      item.find('.start-from-list').on('click', e => {
+        e.stopPropagation();
+        handleStartFromList(act.id);
+      });
       return item;
     };
 
@@ -388,6 +391,10 @@
   };
 
   const handleStartFromList = activityId => {
+    const state = Timer.getState();
+    if (state.currentSession) {
+      Timer.stop();
+    }
     selectedActivityId = activityId;
     highlightSelected();
     startTimer();
@@ -737,7 +744,7 @@
     }
     const unit =
       statsData.units[statsSelectedIndex] || statsData.units[statsData.units.length - 1];
-    if (!unit || !unit.rows.length) {
+    if (!unit || (!unit.rows.length && !Number.isFinite(unit.inactivityMs))) {
       elements.statsTableBody.append(
         '<tr><td colspan="6" class="text-muted">No tracked time for selection.</td></tr>'
       );
@@ -756,14 +763,34 @@
       `);
       elements.statsTableBody.append(tr);
     });
+    const inactivityMinutes = Math.round((unit.inactivityMs || 0) / 60000);
+    const inactivityRow = $(`
+      <tr>
+        <td>Inactivity</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td></td>
+        <td>${formatMinutesLabel(inactivityMinutes)}</td>
+      </tr>
+    `);
+    elements.statsTableBody.append(inactivityRow);
   };
 
   const updateStatsChartSelection = () => {
     if (!statsChart || !statsData) return;
-    const colors = statsData.labels.map((_, idx) =>
+    const trackedColors = statsData.labels.map((_, idx) =>
       idx === statsSelectedIndex ? 'rgba(54, 162, 235, 0.75)' : 'rgba(54, 162, 235, 0.3)'
     );
-    statsChart.data.datasets[0].backgroundColor = colors;
+    const inactivityColors = statsData.labels.map((_, idx) =>
+      idx === statsSelectedIndex ? 'rgba(255, 159, 64, 0.8)' : 'rgba(255, 159, 64, 0.35)'
+    );
+    if (statsChart.data.datasets[0]) {
+      statsChart.data.datasets[0].backgroundColor = trackedColors;
+    }
+    if (statsChart.data.datasets[1]) {
+      statsChart.data.datasets[1].backgroundColor = inactivityColors;
+    }
     statsChart.update();
   };
 
@@ -780,8 +807,11 @@
 
     const ctx = document.getElementById('statsChart').getContext('2d');
     if (statsChart) statsChart.destroy();
-    const baseColors = statsData.labels.map((_, idx) =>
+    const trackedColors = statsData.labels.map((_, idx) =>
       idx === statsSelectedIndex ? 'rgba(54, 162, 235, 0.75)' : 'rgba(54, 162, 235, 0.3)'
+    );
+    const inactivityColors = statsData.labels.map((_, idx) =>
+      idx === statsSelectedIndex ? 'rgba(255, 159, 64, 0.8)' : 'rgba(255, 159, 64, 0.35)'
     );
     statsChart = new Chart(ctx, {
       type: 'bar',
@@ -789,10 +819,18 @@
         labels: statsData.labels,
         datasets: [
           {
-            label: 'Minutes',
-            backgroundColor: baseColors,
+            label: 'Tracked',
+            backgroundColor: trackedColors,
             borderColor: 'rgba(54, 162, 235, 1)',
-            data: statsData.data
+            data: statsData.dataTracked,
+            stack: 'time'
+          },
+          {
+            label: 'Inactivity',
+            backgroundColor: inactivityColors,
+            borderColor: 'rgba(255, 159, 64, 1)',
+            data: statsData.dataInactivity,
+            stack: 'time'
           }
         ]
       },
@@ -801,7 +839,13 @@
         scales: {
           yAxes: [
             {
-              ticks: { beginAtZero: true }
+              ticks: { beginAtZero: true },
+              stacked: true
+            }
+          ],
+          xAxes: [
+            {
+              stacked: true
             }
           ]
         },

@@ -1,6 +1,11 @@
 // Statistics aggregation with selectable unit and navigation (no inactivity)
 (() => {
-  const { getSessions, getActivities, getUserConfig } = window.TimeWiseStorage;
+  const {
+    getSessions,
+    getActivities,
+    getUserConfig,
+    getDaySnapshot
+  } = window.TimeWiseStorage;
   const { getDateKey, startOfWeek, startOfMonth, formatMinutesLabel } =
     window.TimeWiseUtils;
 
@@ -10,12 +15,32 @@
   const buildActivityMap = () =>
     new Map(getActivities().map(act => [act.id, act]));
 
-  const buildUnit = (label, startTs, endTs, sessions, activityMap) => {
-    const totals = new Map();
-    let totalSeconds = 0;
+  const sumInactivityForRange = (sessions, startTs, endTs) => {
+    const dayKeys = new Set();
     sessions.forEach(session => {
       const ts = session.sessionStart;
       if (ts >= startTs && ts < endTs) {
+        dayKeys.add(getDateKey(ts));
+      }
+    });
+    let totalMs = 0;
+    dayKeys.forEach(key => {
+      const snapshot = getDaySnapshot(key);
+      if (snapshot && Number.isFinite(snapshot.inactivityDurationMs)) {
+        totalMs += Math.max(0, snapshot.inactivityDurationMs);
+      }
+    });
+    return totalMs;
+  };
+
+  const buildUnit = (label, startTs, endTs, sessions, activityMap) => {
+    const totals = new Map();
+    let totalSeconds = 0;
+    const unitSessions = [];
+    sessions.forEach(session => {
+      const ts = session.sessionStart;
+      if (ts >= startTs && ts < endTs) {
+        unitSessions.push(session);
         const duration = Math.max(0, session.totalDuration || 0);
         totalSeconds += duration;
         totals.set(session.activityId, (totals.get(session.activityId) || 0) + duration);
@@ -46,12 +71,14 @@
         if (rankA !== rankB) return rankA - rankB;
         return b.totalSeconds - a.totalSeconds;
       });
-    return { label, totalSeconds, rows };
+    const inactivityMs = sumInactivityForRange(unitSessions, startTs, endTs);
+    return { label, totalSeconds, inactivityMs, rows };
   };
 
   const buildDailySeries = (sessions, activityMap, offset = 0, days = 7) => {
     const labels = [];
-    const data = [];
+    const dataTracked = [];
+    const dataInactivity = [];
     const units = [];
     const endDay = new Date();
     endDay.setHours(0, 0, 0, 0);
@@ -64,17 +91,19 @@
       const label = `${d.getMonth() + 1}/${d.getDate()}`;
       const unit = buildUnit(label, start, end, sessions, activityMap);
       labels.push(label);
-      data.push(toMinutes(unit.totalSeconds));
+      dataTracked.push(toMinutes(unit.totalSeconds));
+      dataInactivity.push(Math.round((unit.inactivityMs || 0) / 60000));
       units.push(unit);
     }
     const startWindow = new Date(endDay);
     startWindow.setDate(endDay.getDate() - (days - 1));
-    return { labels, data, units, windowStart: startWindow.getTime() };
+    return { labels, dataTracked, dataInactivity, units, windowStart: startWindow.getTime() };
   };
 
   const buildWeeklySeries = (sessions, activityMap, weekStart = 'monday', offset = 0, weeks = 8) => {
     const labels = [];
-    const data = [];
+    const dataTracked = [];
+    const dataInactivity = [];
     const units = [];
     const now = new Date();
     const currentWeekStart = startOfWeek(now, weekStart);
@@ -87,17 +116,19 @@
       const label = `${start.getMonth() + 1}/${start.getDate()}`;
       const unit = buildUnit(label, start.getTime(), end.getTime(), sessions, activityMap);
       labels.push(label);
-      data.push(toMinutes(unit.totalSeconds));
+      dataTracked.push(toMinutes(unit.totalSeconds));
+      dataInactivity.push(Math.round((unit.inactivityMs || 0) / 60000));
       units.push(unit);
     }
     const startWindow = new Date(currentWeekStart);
     startWindow.setDate(currentWeekStart.getDate() - (weeks - 1) * 7);
-    return { labels, data, units, windowStart: startWindow.getTime() };
+    return { labels, dataTracked, dataInactivity, units, windowStart: startWindow.getTime() };
   };
 
   const buildMonthlySeries = (sessions, activityMap, offset = 0, months = 6) => {
     const labels = [];
-    const data = [];
+    const dataTracked = [];
+    const dataInactivity = [];
     const units = [];
     const now = new Date();
     for (let i = months - 1; i >= 0; i--) {
@@ -114,12 +145,13 @@
         activityMap
       );
       labels.push(label);
-      data.push(toMinutes(unit.totalSeconds));
+      dataTracked.push(toMinutes(unit.totalSeconds));
+      dataInactivity.push(Math.round((unit.inactivityMs || 0) / 60000));
       units.push(unit);
     }
     const startWindow = startOfMonth(now);
     startWindow.setMonth(startWindow.getMonth() - (months - 1 + offset));
-    return { labels, data, units, windowStart: startWindow.getTime() };
+    return { labels, dataTracked, dataInactivity, units, windowStart: startWindow.getTime() };
   };
 
   const getStats = (period, offset = 0) => {
@@ -146,7 +178,8 @@
 
     return {
       labels: result.labels,
-      data: result.data,
+      dataTracked: result.dataTracked,
+      dataInactivity: result.dataInactivity,
       units: result.units,
       hasPrev,
       hasNext
