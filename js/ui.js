@@ -87,6 +87,10 @@
     acc[day] = $(`#target-${day}`);
     return acc;
   }, {});
+  elements.scheduledDayInputs = WEEKDAYS.reduce((acc, day) => {
+    acc[day] = $(`#scheduled-${day}`);
+    return acc;
+  }, {});
 
   const refreshUserConfig = () => {
     userConfig = getUserConfig();
@@ -332,9 +336,26 @@
     const activities = getActivities();
     elements.activitiesTableBody.empty();
     activities.forEach(act => {
+      const desc =
+        act.description && act.description.length > 80
+          ? `${act.description.slice(0, 77)}...`
+          : act.description || '';
+      const estLabel = act.estimatedDuration
+        ? `Est.: ${formatMinutesLabel(act.estimatedDuration)}`
+        : '';
+      const dueLabel = act.deadline ? `Due: ${act.deadline}` : '';
+      const scheduleLabel = Array.isArray(act.scheduledDays) && act.scheduledDays.length
+        ? act.scheduledDays
+            .map(day => day.slice(0, 3))
+            .join('/')
+        : '';
+      const estDue = [estLabel, dueLabel].filter(Boolean).join(' • ');
       const row = $(`
         <tr>
           <td>${act.label}</td>
+          <td class="small text-muted">${desc}</td>
+          <td>${estDue}</td>
+          <td>${scheduleLabel}</td>
           <td class="text-capitalize">${act.category}</td>
           <td><span class="badge badge-${priorityColor(act.priority)}">${act.priority}</span></td>
           <td class="text-capitalize">${act.cognitiveLoad}</td>
@@ -366,12 +387,21 @@
 
   const populateForm = activity => {
     editingActivityId = activity.id;
+    $('#activity-description').val(activity.description || '');
     $('#activity-label').val(activity.label);
     $('#activity-category').val(activity.category);
     $('#activity-priority').val(activity.priority);
     $('#activity-cognitive').val(activity.cognitiveLoad);
     $('#activity-daily-max').val(activity.dailyMax ?? '');
     $('#activity-session-max').val(activity.sessionMax ?? '');
+    $('#activity-estimated').val(activity.estimatedDuration ?? '');
+    $('#activity-deadline').val(activity.deadline ?? '');
+    WEEKDAYS.forEach(day => {
+      const isChecked = Array.isArray(activity.scheduledDays)
+        ? activity.scheduledDays.includes(day)
+        : false;
+      elements.scheduledDayInputs[day].prop('checked', isChecked);
+    });
     $('#activity-submit').text('Update Activity');
   };
 
@@ -388,6 +418,10 @@
     $('#activity-session-max').val(
       userConfig.defaultSessionMaxMinutes !== null ? userConfig.defaultSessionMaxMinutes : ''
     );
+    $('#activity-description').val('');
+    $('#activity-estimated').val('');
+    $('#activity-deadline').val('');
+    WEEKDAYS.forEach(day => elements.scheduledDayInputs[day].prop('checked', false));
   };
 
   const handleStartFromList = activityId => {
@@ -621,12 +655,16 @@
     elements.activityForm.on('submit', e => {
       e.preventDefault();
       const payload = {
+        description: $('#activity-description').val(),
         label: $('#activity-label').val(),
         category: $('#activity-category').val(),
         priority: $('#activity-priority').val(),
         cognitiveLoad: $('#activity-cognitive').val(),
         dailyMax: $('#activity-daily-max').val(),
-        sessionMax: $('#activity-session-max').val()
+        sessionMax: $('#activity-session-max').val(),
+        estimatedDuration: $('#activity-estimated').val(),
+        deadline: $('#activity-deadline').val(),
+        scheduledDays: WEEKDAYS.filter(day => elements.scheduledDayInputs[day].is(':checked'))
       };
       const result = editingActivityId
         ? Activities.updateActivity(editingActivityId, payload)
