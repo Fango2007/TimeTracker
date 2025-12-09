@@ -4,7 +4,8 @@
     generateId,
     isValidPriority,
     isValidCognitiveLoad,
-    isValidCategory
+    isValidCategory,
+    WEEKDAYS
   } = window.TimeWiseUtils;
   const { getActivities, saveActivities, getSessions, getUserConfig } = window.TimeWiseStorage;
 
@@ -14,15 +15,84 @@
     activities.some(
       act =>
         act.id !== ignoreId &&
-        act.label.toLowerCase() === label.trim().toLowerCase()
+      act.label.toLowerCase() === label.trim().toLowerCase()
     );
 
-  const validateActivity = ({ label, category, priority, cognitiveLoad }) => {
+  const isValidDescription = value =>
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim().length <= 300);
+
+  const isValidEstimatedDuration = value => {
+    if (value === null || value === undefined || value === '') return true;
+    const num = Number(value);
+    return Number.isInteger(num) && num > 0;
+  };
+
+  const isValidDeadline = value => {
+    if (value === null || value === undefined || value === '') return true;
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return false;
+    const date = new Date(trimmed);
+    return !Number.isNaN(date.getTime());
+  };
+
+  const isValidScheduledDays = value => {
+    if (value === null || value === undefined || value === '') return true;
+    if (!Array.isArray(value)) return false;
+    return value.every(day => WEEKDAYS.includes(String(day).toLowerCase()));
+  };
+
+  const normalizeScheduledDays = value => {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    value.forEach(day => {
+      const key = String(day).toLowerCase();
+      if (WEEKDAYS.includes(key)) {
+        seen.add(key);
+      }
+    });
+    return Array.from(seen);
+  };
+
+  const normalizeDescription = value => {
+    if (value === null || value === undefined) return null;
+    const trimmed = String(value).trim();
+    return trimmed ? trimmed.slice(0, 300) : null;
+  };
+
+  const normalizeEstimatedDuration = value => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = Number(value);
+    return Number.isInteger(num) && num > 0 ? num : null;
+  };
+
+  const normalizeDeadline = value => {
+    if (value === null || value === undefined || value === '') return null;
+    const trimmed = String(value).trim();
+    return trimmed || null;
+  };
+
+  const validateActivity = ({
+    label,
+    category,
+    priority,
+    cognitiveLoad,
+    description,
+    estimatedDuration,
+    deadline,
+    scheduledDays
+  }) => {
     if (!label || !label.trim()) return 'Label is required';
     if (label.trim().length > 120) return 'Label is too long';
     if (!isValidCategory(category)) return 'Invalid category';
     if (!isValidPriority(priority)) return 'Invalid priority';
     if (!isValidCognitiveLoad(cognitiveLoad)) return 'Invalid cognitive load';
+    if (!isValidDescription(description)) return 'Invalid description';
+    if (!isValidEstimatedDuration(estimatedDuration)) return 'Invalid estimated duration';
+    if (!isValidDeadline(deadline)) return 'Invalid deadline';
+    if (!isValidScheduledDays(scheduledDays)) return 'Invalid scheduled days';
     return null;
   };
 
@@ -69,6 +139,10 @@
         withDefaults.sessionMax === null || withDefaults.sessionMax === ''
           ? null
           : Number(withDefaults.sessionMax),
+      description: normalizeDescription(withDefaults.description),
+      estimatedDuration: normalizeEstimatedDuration(withDefaults.estimatedDuration),
+      deadline: normalizeDeadline(withDefaults.deadline),
+      scheduledDays: normalizeScheduledDays(withDefaults.scheduledDays),
       archived: false
     };
     activities.push(newActivity);
@@ -98,6 +172,10 @@
       merged.sessionMax === null || merged.sessionMax === ''
         ? null
         : Number(merged.sessionMax);
+    merged.description = normalizeDescription(merged.description);
+    merged.estimatedDuration = normalizeEstimatedDuration(merged.estimatedDuration);
+    merged.deadline = normalizeDeadline(merged.deadline);
+    merged.scheduledDays = normalizeScheduledDays(merged.scheduledDays);
 
     activities[idx] = merged;
     saveActivities(activities);
@@ -164,6 +242,23 @@
   const getActiveActivities = () =>
     getActivities().filter(act => !act.archived);
 
+  const totalTrackedMinutes = activityId => {
+    if (!activityId) return 0;
+    const sessions = getSessions();
+    const totalSeconds = sessions
+      .filter(session => session.activityId === activityId)
+      .reduce((acc, session) => acc + Math.max(0, session.totalDuration || 0), 0);
+    return Math.round(totalSeconds / 60);
+  };
+
+  const completionPercentage = activity => {
+    if (!activity || !activity.id) return null;
+    const estimated = normalizeEstimatedDuration(activity.estimatedDuration);
+    if (!estimated) return null;
+    const trackedMinutes = totalTrackedMinutes(activity.id);
+    return Math.min(100, Math.round((trackedMinutes / estimated) * 100));
+  };
+
   window.TimeWiseActivities = {
     createActivity,
     updateActivity,
@@ -172,6 +267,95 @@
     reorderActivities,
     reorderAndReprioritize,
     getActiveActivities,
-    hasSessions
+    hasSessions,
+    totalTrackedMinutes,
+    completionPercentage
   };
+})();
+
+// Daily Feasibility Engine (logic only, no UI)
+(() => {
+  const { getActivities, getUserConfig } = window.TimeWiseStorage;
+  const { getWeekdayKey } = window.TimeWiseUtils;
+  const { totalTrackedMinutes } = window.TimeWiseActivities;
+
+  const countRemainingScheduledDays = (scheduledDays, deadline, todayDate) => {
+    if (!Array.isArray(scheduledDays) || !scheduledDays.length || !deadline) return 0;
+    const normalizedDays = new Set(scheduledDays.map(day => String(day).toLowerCase()));
+    const today = new Date(todayDate);
+    today.setHours(0, 0, 0, 0);
+    const deadlineDate = new Date(deadline);
+    deadlineDate.setHours(0, 0, 0, 0);
+    if (Number.isNaN(deadlineDate.getTime()) || today > deadlineDate) return 0;
+    let count = 0;
+    const cursor = new Date(today);
+    while (cursor <= deadlineDate) {
+      const weekday = getWeekdayKey(cursor);
+      if (normalizedDays.has(weekday)) {
+        count += 1;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return count;
+  };
+
+  const getDailyFeasibility = (todayDate = new Date()) => {
+    const activities = getActivities();
+    const config = getUserConfig();
+    const weekdayKey = getWeekdayKey(todayDate);
+    const targetHours =
+      config.dailyWorkTargets && config.dailyWorkTargets[weekdayKey] !== undefined
+        ? config.dailyWorkTargets[weekdayKey]
+        : 0;
+    const targetMinutes = Math.max(0, Number(targetHours) * 60);
+
+    let requiredTotalToday = 0;
+    let impossible = false;
+
+    activities.forEach(activity => {
+      if (
+        activity.archived ||
+        !Array.isArray(activity.scheduledDays) ||
+        !activity.scheduledDays.length ||
+        !activity.deadline ||
+        !activity.estimatedDuration
+      ) {
+        return;
+      }
+      const todayWeekday = weekdayKey;
+      const normalizedDays = activity.scheduledDays.map(day => String(day).toLowerCase());
+      if (!normalizedDays.includes(todayWeekday)) return;
+
+      const estimated = Number(activity.estimatedDuration);
+      if (!Number.isInteger(estimated) || estimated <= 0) return;
+      const remainingMinutes = Math.max(0, estimated - totalTrackedMinutes(activity.id));
+      const remainingDays = countRemainingScheduledDays(
+        normalizedDays,
+        activity.deadline,
+        todayDate
+      );
+      if (remainingDays <= 0) {
+        impossible = true;
+        return;
+      }
+      requiredTotalToday += remainingMinutes / remainingDays;
+    });
+
+    let state = 'not_feasible';
+    if (!impossible) {
+      if (requiredTotalToday <= targetMinutes) {
+        state = 'feasible';
+      } else if (requiredTotalToday <= targetMinutes * 1.25) {
+        state = 'tight';
+      }
+    }
+
+    return {
+      state: impossible ? 'not_feasible' : state,
+      requiredTotalToday,
+      target: targetMinutes
+    };
+  };
+
+  window.TimeWiseFeasibility = { getDailyFeasibility };
 })();

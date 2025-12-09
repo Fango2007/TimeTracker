@@ -262,6 +262,39 @@
       ) {
         throw new Error('Invalid activity schema');
       }
+      if (
+        act.description !== undefined &&
+        act.description !== null &&
+        (typeof act.description !== 'string' || act.description.length > 300)
+      ) {
+        throw new Error('Invalid activity description');
+      }
+      if (
+        act.estimatedDuration !== undefined &&
+        act.estimatedDuration !== null &&
+        (!Number.isInteger(act.estimatedDuration) || act.estimatedDuration <= 0)
+      ) {
+        throw new Error('Invalid activity estimatedDuration');
+      }
+      if (
+        act.deadline !== undefined &&
+        act.deadline !== null &&
+        (typeof act.deadline !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(act.deadline.trim()) ||
+          Number.isNaN(new Date(act.deadline.trim()).getTime()))
+      ) {
+        throw new Error('Invalid activity deadline');
+      }
+      if (act.scheduledDays !== undefined && act.scheduledDays !== null) {
+        if (!Array.isArray(act.scheduledDays)) {
+          throw new Error('Invalid activity scheduledDays');
+        }
+        act.scheduledDays.forEach(day => {
+          if (!WEEKDAYS.includes(String(day).toLowerCase())) {
+            throw new Error('Invalid activity scheduledDays');
+          }
+        });
+      }
       const normalizedLabel = act.label.trim().toLowerCase();
       if (activityLabels.has(normalizedLabel)) {
         throw new Error('Duplicate activity labels detected');
