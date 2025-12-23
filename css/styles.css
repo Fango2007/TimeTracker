@@ -67,3 +67,80 @@ body {
 details summary {
   cursor: pointer;
 }
+
+/* Feasibility Indicator Styles */
+.feasibility-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.feasibility-indicator.green {
+  background-color: #28a745;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.feasibility-indicator.yellow {
+  background-color: #ffc107;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.feasibility-indicator.red {
+  background-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.feasibility-indicator.gray {
+  background-color: #6c757d;
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
+
+/* Planning Features */
+.planning-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.planning-section h3 {
+  color: #343a40;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+}
+
+.day-structure-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.day-structure-input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.agenda-block {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-left: 3px solid #007bff;
+  border-radius: 4px;
+}
+
+.agenda-block.intense {
+  border-left-color: #dc3545;
+}
+
+.agenda-block.moderate {
+  border-left-color: #ffc107;
+}
+
+.agenda-block.light {
+  border-left-color: #28a745;
+}
