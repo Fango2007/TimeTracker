@@ -28,7 +28,35 @@
       saturday: 3,
       sunday: 0
     },
-    weekStart: 'monday'
+    weekStart: 'monday',
+    // NEW: Day structure configuration fields
+    dayStartTimes: {
+      monday: '09:00',
+      tuesday: '09:00',
+      wednesday: '09:00',
+      thursday: '09:00',
+      friday: '09:00',
+      saturday: '10:00',
+      sunday: '00:00'
+    },
+    lunchBreakStartTimes: {
+      monday: '12:00',
+      tuesday: '12:00',
+      wednesday: '12:00',
+      thursday: '12:00',
+      friday: '12:00',
+      saturday: '12:30',
+      sunday: '00:00'
+    },
+    lunchBreakDurations: {
+      monday: 30,
+      tuesday: 30,
+      wednesday: 30,
+      thursday: 30,
+      friday: 30,
+      saturday: 30,
+      sunday: 0
+    }
   };
 
   const readArray = (key) => {
@@ -204,23 +232,92 @@
     return safeTargets;
   };
 
+  const validateTimeFormat = (timeStr) => {
+    return /^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr);
+  };
+
+  const sanitizeTimeConfig = (config = {}, fieldName = 'time', strict = false) => {
+    const safeConfig = { ...DEFAULT_USER_CONFIG[fieldName] };
+    WEEKDAYS.forEach(day => {
+      const candidate = config[day];
+      if (candidate !== undefined) {
+        if (candidate === '00:00' || validateTimeFormat(candidate)) {
+          safeConfig[day] = candidate;
+        } else if (strict) {
+          throw new Error(`Invalid ${fieldName} format for ${day}. Use HH:MM or "00:00"`);
+        }
+      }
+    });
+    return safeConfig;
+  };
+
+  const sanitizeDurationConfig = (config = {}, fieldName = 'duration', strict = false) => {
+    const safeConfig = { ...DEFAULT_USER_CONFIG[fieldName] };
+    WEEKDAYS.forEach(day => {
+      const candidate = config[day];
+      if (candidate !== undefined) {
+        const num = Number(candidate);
+        if (Number.isFinite(num) && num >= 0 && num <= 180) {
+          safeConfig[day] = num;
+        } else if (strict) {
+          throw new Error(`Invalid ${fieldName} for ${day}. Must be 0-180 minutes`);
+        }
+      }
+    });
+    return safeConfig;
+  };
+
+  const validateDayStructureConstraints = (config = {}, strict = false) => {
+    WEEKDAYS.forEach(day => {
+      const dayStart = config.dayStartTimes?.[day];
+      const lunchStart = config.lunchBreakStartTimes?.[day];
+      
+      if (dayStart && lunchStart && dayStart !== '00:00' && lunchStart !== '00:00') {
+        const dayStartMinutes = parseTime(dayStart);
+        const lunchStartMinutes = parseTime(lunchStart);
+        
+        if (lunchStartMinutes < dayStartMinutes) {
+          if (strict) {
+            throw new Error(`Lunch break cannot start before day start for ${day}`);
+          }
+          // Auto-correct if not strict
+          config.lunchBreakStartTimes[day] = dayStart;
+        }
+      }
+    });
+    return config;
+  };
+
+  const parseTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
   const sanitizeUserConfig = (config = {}, options = {}) => {
     const { strict = false } = options;
     const base = { ...DEFAULT_USER_CONFIG, ...(config && typeof config === 'object' ? config : {}) };
+    
+    // Apply day structure validation and auto-correction
+    const validatedConfig = validateDayStructureConstraints(base, strict);
+    
     return {
-      soundEnabled: base.soundEnabled !== false,
+      soundEnabled: validatedConfig.soundEnabled !== false,
       defaultSessionMaxMinutes: coerceMinutes(
-        base.defaultSessionMaxMinutes,
+        validatedConfig.defaultSessionMaxMinutes,
         'defaultSessionMaxMinutes',
         strict
       ),
       defaultDailyMaxMinutes: coerceMinutes(
-        base.defaultDailyMaxMinutes,
+        validatedConfig.defaultDailyMaxMinutes,
         'defaultDailyMaxMinutes',
         strict
       ),
-      dailyWorkTargets: sanitizeDailyTargets(base.dailyWorkTargets, strict),
-      weekStart: base.weekStart === 'sunday' ? 'sunday' : 'monday'
+      dailyWorkTargets: sanitizeDailyTargets(validatedConfig.dailyWorkTargets, strict),
+      weekStart: validatedConfig.weekStart === 'sunday' ? 'sunday' : 'monday',
+      // NEW: Day structure configuration fields
+      dayStartTimes: sanitizeTimeConfig(validatedConfig.dayStartTimes, 'dayStartTimes', strict),
+      lunchBreakStartTimes: sanitizeTimeConfig(validatedConfig.lunchBreakStartTimes, 'lunchBreakStartTimes', strict),
+      lunchBreakDurations: sanitizeDurationConfig(validatedConfig.lunchBreakDurations, 'lunchBreakDurations', strict)
     };
   };
 
@@ -236,6 +333,56 @@
       sessions,
       userConfig: getUserConfig()
     };
+  };
+
+  const migrateUserConfig = (oldConfig = {}) => {
+    /**
+     * Migrate existing user configuration to include new day structure fields
+     * @param {Object} oldConfig - Existing user configuration
+     * @returns {Object} Migrated configuration with new fields
+     */
+    const migratedConfig = { ...oldConfig };
+    
+    // Add day structure fields if missing
+    if (!migratedConfig.dayStartTimes) {
+      migratedConfig.dayStartTimes = DEFAULT_USER_CONFIG.dayStartTimes;
+    }
+    
+    if (!migratedConfig.lunchBreakStartTimes) {
+      migratedConfig.lunchBreakStartTimes = DEFAULT_USER_CONFIG.lunchBreakStartTimes;
+    }
+    
+    if (!migratedConfig.lunchBreakDurations) {
+      migratedConfig.lunchBreakDurations = DEFAULT_USER_CONFIG.lunchBreakDurations;
+    }
+    
+    // Validate and sanitize the migrated configuration
+    return sanitizeUserConfig(migratedConfig, { strict: true });
+  };
+
+  const migrateExistingData = () => {
+    /**
+     * Automatically migrate existing user data to new format
+     * @returns {boolean} True if migration was performed
+     */
+    try {
+      const rawConfig = localStorage.getItem(USER_CONFIG_KEY);
+      if (rawConfig) {
+        const parsedConfig = JSON.parse(rawConfig);
+        
+        // Check if migration is needed
+        if (!parsedConfig.dayStartTimes || !parsedConfig.lunchBreakStartTimes || !parsedConfig.lunchBreakDurations) {
+          const migratedConfig = migrateUserConfig(parsedConfig);
+          saveUserConfig(migratedConfig);
+          console.log('✅ User configuration migrated to include day structure fields');
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Migration failed:', error);
+      return false;
+    }
   };
 
   const importAll = (payload) => {
@@ -385,6 +532,11 @@
     recomputeDaySnapshot,
     exportAll,
     importAll,
+    migrateUserConfig,
+    migrateExistingData,
     keys: { ACTIVITIES_KEY, LOGS_KEY, USER_CONFIG_KEY, DAY_SNAPSHOTS_KEY }
   };
+
+  // Auto-migrate existing data on initialization
+  migrateExistingData();
 })();

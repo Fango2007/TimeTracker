@@ -102,6 +102,82 @@ const sortByLabel = list =>
 const sumSeconds = intervals =>
   intervals.reduce((acc, interval) => acc + (interval.duration || 0), 0);
 
+// Time utility functions for planning features
+const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const parseTime = (timeStr) => {
+  if (!TIME_REGEX.test(timeStr)) {
+    throw new Error(`Invalid time format. Use HH:MM. Received: ${timeStr}`);
+  }
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const formatTime = (minutes) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+const addMinutes = (timeStr, minutesToAdd) => {
+  const totalMinutes = parseTime(timeStr) + minutesToAdd;
+  return formatTime(totalMinutes);
+};
+
+const validateTimeFormat = (timeStr) => TIME_REGEX.test(timeStr);
+
+// Day structure validation
+const validateDayStructure = (config) => {
+  WEEKDAYS.forEach(day => {
+    const dayStart = config.dayStartTimes?.[day];
+    const lunchStart = config.lunchBreakStartTimes?.[day];
+    
+    if (dayStart && !validateTimeFormat(dayStart) && dayStart !== '00:00') {
+      throw new Error(`Invalid dayStartTime format for ${day}. Use HH:MM or "00:00"`);
+    }
+    
+    if (lunchStart && !validateTimeFormat(lunchStart) && lunchStart !== '00:00') {
+      throw new Error(`Invalid lunchBreakStartTime format for ${day}. Use HH:MM or "00:00"`);
+    }
+    
+    if (dayStart && lunchStart && dayStart !== '00:00' && lunchStart !== '00:00') {
+      const dayStartMinutes = parseTime(dayStart);
+      const lunchStartMinutes = parseTime(lunchStart);
+      
+      if (lunchStartMinutes < dayStartMinutes) {
+        throw new Error(`Lunch break cannot start before day start for ${day}`);
+      }
+    }
+    
+    const duration = config.lunchBreakDurations?.[day];
+    if (duration !== undefined && (duration < 0 || duration > 180)) {
+      throw new Error(`Lunch break duration for ${day} must be between 0 and 180 minutes`);
+    }
+  });
+  return true;
+};
+
+// Error handling utilities
+const createErrorHandler = (context = 'Unknown') => {
+  return (error, message = 'Operation failed') => {
+    console.error(`[${context}] ${message}:`, error);
+    return null;
+  };
+};
+
+const handleAsyncError = (promise, context = 'AsyncOperation') => {
+  return promise.catch(error => {
+    console.error(`[${context}] Async error:`, error);
+    throw error;
+  });
+};
+
+// Date utilities (already exist, but adding for completeness)
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
 window.TimeWiseUtils = {
   generateId,
   pad,
@@ -119,6 +195,16 @@ window.TimeWiseUtils = {
   isValidCategory,
   sortByLabel,
   sumSeconds,
+  // NEW: Planning feature utilities
+  parseTime,
+  formatTime,
+  addMinutes,
+  validateTimeFormat,
+  validateDayStructure,
+  createErrorHandler,
+  handleAsyncError,
+  getTodayDate,
+  TIME_REGEX,
   PRIORITIES,
   COGNITIVE_LOADS,
   CATEGORIES,
