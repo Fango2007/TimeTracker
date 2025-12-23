@@ -105,6 +105,16 @@ As a time management user, I want to configure my daily work structure including
 - How does system handle invalid time formats in day structure configuration? [System validates and shows error messages for invalid formats]
 - What happens when day structure settings result in insufficient working time? [System warns user and suggests adjusting work targets or break durations]
 
+## Out-of-Scope Features
+
+The following features are explicitly excluded from this planning & scheduling module:
+
+- **Team Collaboration**: Multi-user collaboration, shared agendas, or team scheduling features
+- **Calendar Sync**: Integration with external calendar systems (Google Calendar, Outlook, etc.)
+- **Mobile Applications**: Native mobile app development (web-responsive design only)
+- **Advanced Analytics**: Complex reporting, data visualization, or predictive analytics beyond basic feasibility indicators
+- **Third-party Integrations**: API integrations with other productivity tools or platforms
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -152,6 +162,9 @@ As a time management user, I want to configure my daily work structure including
 - **QUAL-002**: User interface MUST provide real-time updates when agenda data changes
 - **QUAL-003**: System MUST handle edge cases gracefully with appropriate user feedback
 - **QUAL-004**: All user-facing text MUST be clear and actionable
+- **QUAL-005**: User interface MUST comply with WCAG 2.1 AA accessibility standards
+- **QUAL-006**: Error messages MUST provide actionable guidance for resolution
+- **QUAL-007**: Loading states MUST include visual indicators and estimated completion times where possible
 
 ## Clarifications
 
@@ -166,6 +179,12 @@ As a time management user, I want to configure my daily work structure including
 - Q: How should day structure configuration be handled for non-working days? → A: Non-working days should have "00:00" for dayStartTimes and lunchBreakStartTimes, and 0 for lunchBreakDurations
 - Q: What happens when day structure settings conflict with existing agenda blocks? → A: System should warn user and suggest recomputing agenda to respect new constraints
 - Q: Should day structure settings be applied retroactively to existing agendas? → A: No, only affect future agenda generation unless user explicitly recomputes
+
+### Session 2024-07-17 (Clarification Session)
+
+- Q: How should the system handle and display error, empty, and loading states for the day structure configuration UI? → A: Show user-friendly error messages with actionable guidance (e.g., "Invalid time format. Use HH:MM")
+- Q: What features should be explicitly declared as out-of-scope for this planning & scheduling module? → A: Explicitly exclude: team collaboration, calendar sync, mobile apps, advanced analytics
+- Q: What accessibility standards should the day structure configuration UI comply with? → A: WCAG 2.1 AA compliance
 
 ## Success Criteria *(mandatory)*
 
