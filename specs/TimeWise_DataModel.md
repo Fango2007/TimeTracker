@@ -36,22 +36,22 @@ type Activity = {
 ```
 
 **Constraints:**
-- **DM-ACT-001** — `id` MUST be globally unique.
-- **DM-ACT-002** — `label` MUST be unique (case-insensitive).
-- **DM-ACT-003** — `category` MUST be one of the supported category values defined by the application.
-- **DM-ACT-004** — `dailyMax` MUST be a positive integer representing minutes per day.
-- **DM-ACT-005** — `sessionMax` MUST be a positive integer representing minutes per session.
-- **DM-ACT-006** — `priority` MUST be one of `"low"`, `"medium"`, `"high"`.
-- **DM-ACT-007** — `cognitiveLoad` MUST be one of `"light"`, `"moderate"`, `"intense"`.
-- **DM-ACT-008** — `description` is optional free text.
-- **DM-ACT-009** — `estimatedDuration` is optional but, if present, MUST be a positive integer (minutes).
-- **DM-ACT-010** — `deadline` is optional but, if present, MUST be a valid local date string (`YYYY-MM-DD`).
-- **DM-ACT-011** — `scheduledDays` is optional; if present, it MUST be an array of weekday identifiers (`"monday"` … `"sunday"`).
-- **DM-ACT-012** — Activities with no `scheduledDays` are considered unscheduled and MUST NOT enter feasibility calculations unless manually selected.
-- **DM-ACT-013** — Archived activities MUST remain in storage for historical consistency.
-- **DM-ACT-014** — An activity MAY be deleted only if no sessions are associated with it; otherwise it MUST be archived.
-- **DM-ACT-015** — If both `dailyMax` and `sessionMax` are defined, `sessionMax` MUST be ≤ `dailyMax`.
-- **DM-ACT-016** — `estimatedDuration` represents a target total duration; actual tracked time MAY exceed this value.
+ — `id` MUST be globally unique.
+ — `label` MUST be unique (case-insensitive).
+ — `category` MUST be one of the supported category values defined by the application.
+ — `dailyMax` MUST be a positive integer representing minutes per day.
+ — `sessionMax` MUST be a positive integer representing minutes per session.
+ — `priority` MUST be one of `"low"`, `"medium"`, `"high"`.
+ — `cognitiveLoad` MUST be one of `"light"`, `"moderate"`, `"intense"`.
+ — `description` is optional free text.
+ — `estimatedDuration` is optional but, if present, MUST be a positive integer (minutes).
+ — `deadline` is optional but, if present, MUST be a valid local date string (`YYYY-MM-DD`).
+ — `scheduledDays` is optional; if present, it MUST be an array of weekday identifiers (`"monday"` … `"sunday"`).
+ — Activities with no `scheduledDays` are considered unscheduled and MUST NOT enter feasibility calculations unless manually selected.
+ — Archived activities MUST remain in storage for historical consistency.
+ — An activity MAY be deleted only if no sessions are associated with it; otherwise it MUST be archived.
+ — If both `dailyMax` and `sessionMax` are defined, `sessionMax` MUST be ≤ `dailyMax`.
+ — `estimatedDuration` represents a target total duration; actual tracked time MAY exceed this value.
 
 
 ### Session
@@ -68,17 +68,17 @@ type Session = {
 ```
 
 **Constraints:**
-- **DM-SES-001** — Each session MUST reference a valid `activityId`.
-- **DM-SES-002** — `sessionStart` MUST be a valid timestamp expressed in epoch milliseconds.
-- **DM-SES-003** — `sessionEnd` is optional while the session is active; once the session is stopped, `sessionEnd` MUST be set and MUST be ≥ `sessionStart`.
-- **DM-SES-004** — A session MUST NOT span across calendar days.
-- **DM-SES-005** — A session MAY contain zero or more `intervals`.
-- **DM-SES-006** — Intervals within the same session MUST NOT overlap.
-- **DM-SES-007** — `totalDuration` MUST be derived from the sum of all intervals and MUST NOT be manually edited (in seconds).
-- **DM-SES-008** — At most one session MAY be active at any time.
-- **DM-SES-009** — Paused time MUST NOT contribute to `totalDuration`.
-- **DM-SES-010** — Session “active” state is derived at runtime from the absence of `sessionEnd` and MUST NOT be persisted as a separate field.
-- **DM-SES-011** — Intervals MUST represent only active tracking spans; paused periods MUST NOT be represented as intervals.
+ — Each session MUST reference a valid `activityId`.
+ — `sessionStart` MUST be a valid timestamp expressed in epoch milliseconds.
+ — `sessionEnd` is optional while the session is active; once the session is stopped, `sessionEnd` MUST be set and MUST be ≥ `sessionStart`.
+ — A session MUST NOT span across calendar days.
+ — A session MAY contain zero or more `intervals`.
+ — Intervals within the same session MUST NOT overlap.
+ — `totalDuration` MUST be derived from the sum of all intervals and MUST NOT be manually edited (in seconds).
+ — At most one session MAY be active at any time.
+ — Paused time MUST NOT contribute to `totalDuration`.
+ — Session “active” state is derived at runtime from the absence of `sessionEnd` and MUST NOT be persisted as a separate field.
+ — Intervals MUST represent only active tracking spans; paused periods MUST NOT be represented as intervals.
 
 
 ### Interval
@@ -92,11 +92,11 @@ type Interval = {
 ```
 
 **Constraints:**
-- **DM-INT-001** — `start` MUST be a valid timestamp expressed in epoch milliseconds.
-- **DM-INT-002** — `end` MAY be null only for a currently running interval; otherwise `end` MUST be a valid timestamp expressed in epoch milliseconds and MUST be ≥ `start`.
-- **DM-INT-003** — For completed intervals (`end` not null), `duration` MUST equal `(end - start) / 1000`.
-- **DM-INT-004** — `intervals` within a session MUST be chronological (sorted by `start`) and MUST be non-overlapping.
-- **DM-INT-005** — `duration` MUST be expressed in seconds, while `start` and `end` are expressed in epoch milliseconds.
+ — `start` MUST be a valid timestamp expressed in epoch milliseconds.
+ — `end` MAY be null only for a currently running interval; otherwise `end` MUST be a valid timestamp expressed in epoch milliseconds and MUST be ≥ `start`.
+ — For completed intervals (`end` not null), `duration` MUST equal `(end - start) / 1000`.
+ — `intervals` within a session MUST be chronological (sorted by `start`) and MUST be non-overlapping.
+ — `duration` MUST be expressed in seconds, while `start` and `end` are expressed in epoch milliseconds.
 
 
 ### DaySnapshot (per calendar day)
@@ -113,15 +113,15 @@ type DaySnapshot = {
 ```
 
 **Constraints:**
-- **DM-DAY-001** — `date` MUST be a valid local date string in the format `YYYY-MM-DD`.
-- **DM-DAY-002** — `firstTimerAt` MUST be set when the first timer of the day is started and MUST be a valid timestamp expressed in epoch milliseconds.
-- **DM-DAY-003** — `dayEndAt` SHOULD be set when the user clicks **Close day**; if `dayEndAt` is null, statistics computations MUST fallback to the latest `sessionEnd` for that date.
-- **DM-DAY-004** — `dayEndAt`, when set, MUST be a valid timestamp expressed in epoch milliseconds and MUST be ≥ `firstTimerAt` when `firstTimerAt` is not null.
-- **DM-DAY-005** — `inactivityDurationMs` MAY be cached once the day is closed; when present, it MUST be ≥ 0.
-- **DM-DAY-006** — The implementation MAY recompute inactivity from sessions instead of using `inactivityDurationMs` to avoid inconsistencies.
-- **DM-DAY-007** — If a day has no sessions, `firstTimerAt`, `dayEndAt`, and `inactivityDurationMs` MUST remain null or absent, and no inactivity MUST be computed for that date.
-- **DM-DAY-008** — `firstTimerAt` MUST NOT be set unless at least one Session exists for that date.
-- **DM-DAY-009** — `dayEndAt` MUST NOT be set earlier than the latest `sessionEnd` for that date.
+ — `date` MUST be a valid local date string in the format `YYYY-MM-DD`.
+ — `firstTimerAt` MUST be set when the first timer of the day is started and MUST be a valid timestamp expressed in epoch milliseconds.
+ — `dayEndAt` SHOULD be set when the user clicks **Close day**; if `dayEndAt` is null, statistics computations MUST fallback to the latest `sessionEnd` for that date.
+ — `dayEndAt`, when set, MUST be a valid timestamp expressed in epoch milliseconds and MUST be ≥ `firstTimerAt` when `firstTimerAt` is not null.
+ — `inactivityDurationMs` MAY be cached once the day is closed; when present, it MUST be ≥ 0.
+ — The implementation MAY recompute inactivity from sessions instead of using `inactivityDurationMs` to avoid inconsistencies.
+ — If a day has no sessions, `firstTimerAt`, `dayEndAt`, and `inactivityDurationMs` MUST remain null or absent, and no inactivity MUST be computed for that date.
+ — `firstTimerAt` MUST NOT be set unless at least one Session exists for that date.
+ — `dayEndAt` MUST NOT be set earlier than the latest `sessionEnd` for that date.
 
 
 ## Storage schema
@@ -154,6 +154,11 @@ type UserConfig = {
   dailyWorkTargets: Record<Weekday, number>; // hours per day (integer or float, per your spec)
 
   weekStart: Weekday;
+
+  // Day structure configuration
+  dayStartTimes: Record<Weekday, string>; // "HH:MM" format for each day
+  lunchBreakStartTimes: Record<Weekday, string>; // "HH:MM" format for each day
+  lunchBreakDurations: Record<Weekday, number>; // minutes for each day
 };
 ```
 
@@ -174,26 +179,57 @@ Example (valid JSON):
     "saturday": 3,
     "sunday": 0
   },
-  "weekStart": "monday"
+  "weekStart": "monday",
+  "dayStartTimes": {
+    "monday": "09:00",
+    "tuesday": "09:00",
+    "wednesday": "09:00",
+    "thursday": "09:00",
+    "friday": "09:00",
+    "saturday": "10:00",
+    "sunday": "00:00"
+  },
+  "lunchBreakStartTimes": {
+    "monday": "12:00",
+    "tuesday": "12:00",
+    "wednesday": "12:00",
+    "thursday": "12:00",
+    "friday": "12:00",
+    "saturday": "12:30",
+    "sunday": "00:00"
+  },
+  "lunchBreakDurations": {
+    "monday": 30,
+    "tuesday": 30,
+    "wednesday": 30,
+    "thursday": 30,
+    "friday": 30,
+    "saturday": 30,
+    "sunday": 0
+  }
 }
 ```
 
 **Constraints:**
-- **DM-STO-001** — Application state MUST be persisted exclusively under the following top-level keys: `activities`, `sessions`, `daySnapshots`, `weeklyAgenda`, `userConfig`.
-- **DM-STO-002** — Each storage key MUST contain a JSON-serialisable value; circular references are not permitted.
-- **DM-STO-003** — `activities` MUST be a map keyed by Activity `id`; values MUST conform to the Activity data model.
-- **DM-STO-004** — `sessions` MUST be a map keyed by Session `id`; values MUST conform to the Session data model.
-- **DM-STO-005** — `daySnapshots` MUST be a map keyed by local date strings (`YYYY-MM-DD`); values MUST conform to the DaySnapshot data model.
-- **DM-STO-006** — `weeklyAgenda` MUST be either null/absent or a single object conforming to the Weekly Execution Agenda data model.
-- **DM-STO-007** — `userConfig` MUST be a single object containing all user-defined settings; partial duplication of settings across keys is not permitted.
-- **DM-STO-008** — Persisted data MUST be forward-compatible: unknown fields MUST be ignored rather than causing load failure.
-- **DM-STO-009** — Persisted data MUST be backward-compatible where possible; missing optional fields MUST assume safe defaults.
-- **DM-STO-010** — Corrupted or non-parseable storage entries MUST be handled gracefully without crashing the application.
-
-- **DM-CFG-001** — `defaultSessionMaxMinutes` MUST be a positive number.
-- **DM-CFG-002** — `defaultDailyMaxMinutes` MUST be a positive number and MUST be ≥ `defaultSessionMaxMinutes`.
-- **DM-CFG-003** — Each value in `dailyWorkTargets` MUST be a number ≥ 0.
-- **DM-CFG-004** — Values in `dailyWorkTargets` MUST be expressed in hours (not minutes).
+ — Application state MUST be persisted exclusively under the following top-level keys: `activities`, `sessions`, `daySnapshots`, `weeklyAgenda`, `userConfig`.
+ — Each storage key MUST contain a JSON-serialisable value; circular references are not permitted.
+ — `activities` MUST be a map keyed by Activity `id`; values MUST conform to the Activity data model.
+ — `sessions` MUST be a map keyed by Session `id`; values MUST conform to the Session data model.
+ — `daySnapshots` MUST be a map keyed by local date strings (`YYYY-MM-DD`); values MUST conform to the DaySnapshot data model.
+ — `weeklyAgenda` MUST be either null/absent or a single object conforming to the Weekly Execution Agenda data model.
+ — `userConfig` MUST be a single object containing all user-defined settings; partial duplication of settings across keys is not permitted.
+ — Persisted data MUST be forward-compatible: unknown fields MUST be ignored rather than causing load failure.
+ — Persisted data MUST be backward-compatible where possible; missing optional fields MUST assume safe defaults.
+ — Corrupted or non-parseable storage entries MUST be handled gracefully without crashing the application.
+ — `defaultSessionMaxMinutes` MUST be a positive number.
+ — `defaultDailyMaxMinutes` MUST be a positive number and MUST be ≥ `defaultSessionMaxMinutes`.
+ — Each value in `dailyWorkTargets` MUST be a number ≥ 0.
+ — Values in `dailyWorkTargets` MUST be expressed in hours (not minutes).
+ — Each value in `dayStartTimes` MUST be a valid time string in `HH:MM` format.
+ — Each value in `lunchBreakStartTimes` MUST be a valid time string in `HH:MM` format.
+ — Each value in `lunchBreakDurations` MUST be a non-negative number representing minutes.
+ — For each day, `lunchBreakStartTimes` MUST be ≥ `dayStartTimes` if both are set and non-zero.
+ — For each day, the sum of `dailyWorkTargets` (in minutes) and `lunchBreakDurations` MUST fit within reasonable working day boundaries.
 
 
 ### Weekly Execution Agenda Storage (new)
@@ -227,31 +263,31 @@ type WeeklyExecutionAgenda = {
 };
 ```
 **Constraints:**
-- **DM-WAG-010** — `weekId` MUST be a valid ISO week identifier in the format `YYYY-Www` (e.g. `2025-W03`).
-- **DM-WAG-011** — `weekStartDate` MUST be a valid local date string in the format `YYYY-MM-DD` and MUST correspond to `userConfig.weekStart` for that `weekId`.
-- **DM-WAG-012** — `days` MUST be an object keyed by local date strings (`YYYY-MM-DD`) covering the 7-day span starting at `weekStartDate`.
-- **DM-WAG-013** — Each `days[date]` value MUST be an array of AgendaEntry objects.
-- **DM-WAG-014** — For any given `date`, AgendaEntry blocks MUST be ordered chronologically by `plannedStart`.
-- **DM-WAG-015** — For any given `date`, AgendaEntry blocks MUST NOT overlap in planned time.
-- **DM-WAG-016** — Each AgendaEntry `id` MUST be globally unique within the stored `weeklyAgenda`.
-- **DM-WAG-017** — Each AgendaEntry `activityId` MUST reference an existing Activity at the time of persistence; if the Activity is later archived, the reference MUST remain valid for historical consistency.
-- **DM-WAG-018** — `plannedStart` / `plannedEnd` MUST be valid local times in `HH:MM` format and MUST fall within the applicable Day Structure working window for that `date`.
-- **DM-WAG-019** — `durationMinutes` MUST equal the difference between `plannedEnd` and `plannedStart` for each AgendaEntry.
-- **DM-WAG-020** — All keys in `days` MUST fall within the 7-day range starting at `weekStartDate`.
+ — `weekId` MUST be a valid ISO week identifier in the format `YYYY-Www` (e.g. `2025-W03`).
+ — `weekStartDate` MUST be a valid local date string in the format `YYYY-MM-DD` and MUST correspond to `userConfig.weekStart` for that `weekId`.
+ — `days` MUST be an object keyed by local date strings (`YYYY-MM-DD`) covering the 7-day span starting at `weekStartDate`.
+ — Each `days[date]` value MUST be an array of AgendaEntry objects.
+ — For any given `date`, AgendaEntry blocks MUST be ordered chronologically by `plannedStart`.
+ — For any given `date`, AgendaEntry blocks MUST NOT overlap in planned time.
+ — Each AgendaEntry `id` MUST be globally unique within the stored `weeklyAgenda`.
+ — Each AgendaEntry `activityId` MUST reference an existing Activity at the time of persistence; if the Activity is later archived, the reference MUST remain valid for historical consistency.
+ — `plannedStart` / `plannedEnd` MUST be valid local times in `HH:MM` format and MUST fall within the applicable Day Structure working window for that `date`.
+ — `durationMinutes` MUST equal the difference between `plannedEnd` and `plannedStart` for each AgendaEntry.
+ — All keys in `days` MUST fall within the 7-day range starting at `weekStartDate`.
 ---
 
 **Behaviour:**
-- **DM-WAG-001** — On application load, if `weekId` does NOT match the current week (per `userConfig.weekStart`), the stored `weeklyAgenda` MUST be discarded and a fresh one MUST be generated from the Global Agenda.
-- **DM-WAG-002** — On AgendaEntry changes (executed, skipped, swapped, adjusted), the persisted agenda MUST be updated immediately.
-- **DM-WAG-003** — On Close Day, all blocks for that date MUST commit their final status; blocks for future days MAY be reshaped, but past-day blocks MUST remain immutable.
-- **DM-WAG-004** — On Activity metadata changes (deadline, estimatedDuration, scheduledDays), only future days of the current week MAY be altered.
+ — On application load, if `weekId` does NOT match the current week (per `userConfig.weekStart`), the stored `weeklyAgenda` MUST be discarded and a fresh one MUST be generated from the Global Agenda.
+ — On AgendaEntry changes (executed, skipped, swapped, adjusted), the persisted agenda MUST be updated immediately.
+ — On Close Day, all blocks for that date MUST commit their final status; blocks for future days MAY be reshaped, but past-day blocks MUST remain immutable.
+ — On Activity metadata changes (deadline, estimatedDuration, scheduledDays), only future days of the current week MAY be altered.
 
 ---
 
 **Rules:**
-- **DM-WAG-005** — Only one week MUST be stored at a time; past weeks MAY be discarded.
-- **DM-WAG-006** — Persisted blocks MUST NOT silently change identity, order, or duration unless a valid user adjustment occurs or early-start rules require a structural change.
-- **DM-WAG-007** — The persisted Weekly Execution Agenda MUST be the authoritative data for the Timer Screen Weekly Extract, the Agenda View, and agenda-related status transitions.
+ — Only one week MUST be stored at a time; past weeks MAY be discarded.
+ — Persisted blocks MUST NOT silently change identity, order, or duration unless a valid user adjustment occurs or early-start rules require a structural change.
+ — The persisted Weekly Execution Agenda MUST be the authoritative data for the Timer Screen Weekly Extract, the Agenda View, and agenda-related status transitions.
 
 ---
 
@@ -274,14 +310,14 @@ type AgendaEntry = {
 ```
 
 **Constraints:**
-- **DM-AGE-001** — Each AgendaEntry MUST have a globally unique `id`.
-- **DM-AGE-002** — `activityId` MUST reference an existing Activity.
-- **DM-AGE-003** — `plannedStart` and `plannedEnd` MUST be valid local times in `HH:MM` format.
-- **DM-AGE-004** — `plannedEnd` MUST be strictly later than `plannedStart`.
-- **DM-AGE-005** — `durationMinutes` MUST equal the difference between `plannedEnd` and `plannedStart`.
-- **DM-AGE-006** — `status` MUST be one of: `"planned"`, `"executed"`, `"executedEarlier"`, `"skipped"`, `"postponed"`, `"adjusted"`.
-- **DM-AGE-007** — AgendaEntries within the same day MUST NOT overlap in planned time.
-- **DM-AGE-008** — AgendaEntries MUST lie within the applicable Day Structure working window for that date.
+ — Each AgendaEntry MUST have a globally unique `id`.
+ — `activityId` MUST reference an existing Activity.
+ — `plannedStart` and `plannedEnd` MUST be valid local times in `HH:MM` format.
+ — `plannedEnd` MUST be strictly later than `plannedStart`.
+ — `durationMinutes` MUST equal the difference between `plannedEnd` and `plannedStart`.
+ — `status` MUST be one of: `"planned"`, `"executed"`, `"executedEarlier"`, `"skipped"`, `"postponed"`, `"adjusted"`.
+ — AgendaEntries within the same day MUST NOT overlap in planned time.
+ — AgendaEntries MUST lie within the applicable Day Structure working window for that date.
 
 
 
@@ -301,32 +337,31 @@ type AgendaEntry = {
 }
 ```
 **Constraints:**
-- **DM-IE-001** — JSON export MUST be the canonical backup format and MUST include: `activities`, `sessions`, `userConfig`, `daySnapshots`, and `weeklyAgenda`.
-- **DM-IE-002** — `version` MUST be present and MUST be used to drive backward-compatible import behaviour.
-- **DM-IE-003** — `exportedAt` MUST be present and MUST be an epoch-milliseconds timestamp.
-- **DM-IE-004** — Export MUST be deterministic and MUST NOT omit persisted state that affects user experience (settings, agenda, day snapshots).
-- **DM-IE-005** — Import MUST ignore unknown fields (forward compatibility) and MUST apply safe defaults for missing optional fields (backward compatibility).
-- **DM-IE-006** — Export MUST NOT include any telemetry/analytics identifiers (privacy).
+ — JSON export MUST be the canonical backup format and MUST include: `activities`, `sessions`, `userConfig`, `daySnapshots`, and `weeklyAgenda`.
+ — `version` MUST be present and MUST be used to drive backward-compatible import behaviour.
+ — `exportedAt` MUST be present and MUST be an epoch-milliseconds timestamp.
+ — Export MUST be deterministic and MUST NOT omit persisted state that affects user experience (settings, agenda, day snapshots).
+ — Import MUST ignore unknown fields (forward compatibility) and MUST apply safe defaults for missing optional fields (backward compatibility).
+ — Export MUST NOT include any telemetry/analytics identifiers (privacy).
 
 **Rules:**
-- **DM-IE-007** — If `weeklyAgenda` is missing or invalid, the implementation MUST treat it as absent and regenerate it from the Global Agenda on next load (do not block import solely for this reason).
-- **DM-IE-008** — If `daySnapshots` is missing, it MUST be treated as empty; inactivity MAY be recomputed later from sessions.
+ — If `weeklyAgenda` is missing or invalid, the implementation MUST treat it as absent and regenerate it from the Global Agenda on next load (do not block import solely for this reason).
+ — If `daySnapshots` is missing, it MUST be treated as empty; inactivity MAY be recomputed later from sessions.
 
 
 ### JSON import validation
 
 **Constraints:**
-- **DM-IE-010** — Root MUST be a JSON object.
-- **DM-IE-011** — `activities` MUST be present and MUST contain valid Activity objects (see Activity constraints).
-- **DM-IE-012** — `sessions` MUST be present and MUST contain valid Session objects (see Session constraints).
-- **DM-IE-013** — All `sessions[].activityId` references MUST exist in `activities`.
-- **DM-IE-014** — IDs MUST be unique within their entity set (no duplicate Activity IDs, no duplicate Session IDs, etc.).
-- **DM-IE-015** — If present, `daySnapshots` MUST be an object keyed by `YYYY-MM-DD` with valid DaySnapshot objects.
-- **DM-IE-016** — If present, `weeklyAgenda` MUST conform to the Weekly Execution Agenda structure; if invalid, it MUST be discarded (see DM-IE-007).
-- **DM-IE-017** — If present, `userConfig` MUST be an object; missing fields MUST be defaulted safely.
-- **DM-IE-018** — Imports with an unsupported `version` MUST be rejected with a clear error message.
-- **DM-IE-019** — Any validation failure for `activities` or `sessions` MUST block import.
-
+ — Root MUST be a JSON object.
+ — `activities` MUST be present and MUST contain valid Activity objects (see Activity constraints).
+ — `sessions` MUST be present and MUST contain valid Session objects (see Session constraints).
+ — All `sessions[].activityId` references MUST exist in `activities`.
+ — IDs MUST be unique within their entity set (no duplicate Activity IDs, no duplicate Session IDs, etc.).
+ — If present, `daySnapshots` MUST be an object keyed by `YYYY-MM-DD` with valid DaySnapshot objects.
+ — If present, `weeklyAgenda` MUST conform to the Weekly Execution Agenda structure; if invalid, it MUST be discarded (see DM-IE-007).
+ — If present, `userConfig` MUST be an object; missing fields MUST be defaulted safely.
+ — Imports with an unsupported `version` MUST be rejected with a clear error message.
+ — Any validation failure for `activities` or `sessions` MUST block import.
 
 ---
 ### Appendix A – Enumerations

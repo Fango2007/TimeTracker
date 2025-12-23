@@ -36,6 +36,8 @@ As a time management user, I want to see how my work is distributed across futur
 1. **Given** I have activities with future deadlines, **When** I view the global agenda, **Then** I see my work distributed across remaining days up to the latest deadline
 2. **Given** I have activities with different cognitive loads, **When** the system computes the agenda, **Then** it respects my daily structure constraints and working hours
 3. **Given** I change activity durations or deadlines, **When** I refresh the view, **Then** the global agenda updates to reflect the new distribution
+4. Given I have activities with max session and daily max duration, an agenda block cannot exceed the max session duration. Several aganda blocks can be scheduled but they cannot exceed the daily max duration.
+5. Given I have a daily work target, if the sum of all activities for the day is lower then suggest to schedule others activities.  
 
 ---
 
@@ -52,7 +54,7 @@ As a time management user, I need a structured daily agenda with adjustable time
 1. **Given** I have activities to complete with manual cognitive load classifications, **When** I generate my daily agenda, **Then** I see time blocks ordered by my specified cognitive load (intense tasks earlier in the day)
 2. **Given** I want to rearrange my schedule, **When** I swap agenda blocks, **Then** the system maintains overall schedule integrity
 3. **Given** I start working on a planned activity, **When** I start the timer on time, **Then** the agenda block status updates to "executed"
-4. **Given** I start working late on an activity, **When** I start the timer after the planned time, **Then** the agenda block status updates to "skipped"
+4. **Given** I start working late on an activity, **When** I start the timer after the planned time and not my working window, **Then** the agenda block status updates to "skipped"
 5. **Given** my timer start conflicts with agenda constraints, **When** I start the timer, **Then** the timer takes precedence and system shows warning about agenda deviation
 
 ---
@@ -71,9 +73,24 @@ As a time management user, I want my agenda to adjust automatically when I start
 2. **Given** I start early on one activity, **When** the system recomputes my agenda, **Then** it adjusts downstream blocks while maintaining my day structure constraints
 3. **Given** I start a block early, **When** the agenda updates, **Then** the original block is marked as "executed earlier" for tracking purposes
 
+### User Story 5 - Day Structure Configuration (Priority: P2)
+
+As a time management user, I want to configure my daily work structure including lunch break duration and start time, and day start time so that my agenda planning respects my personal work habits and schedule.
+
+**Why this priority**: Provides essential personalization for realistic agenda planning that aligns with individual work patterns.
+
+**Independent Test**: Can be tested by configuring different day structure settings and verifying the agenda respects these constraints.
+
+**Acceptance Scenarios**:
+
+1. **Given** I configure a lunch break duration and start time, **When** the system generates my agenda, **Then** it schedules work blocks around my lunch break
+2. **Given** I set a specific day start time, **When** the system calculates my working window, **Then** it uses this start time for agenda planning
+3. **Given** I have configured lunch break and day start settings, **When** I view my daily schedule, **Then** the visual representation shows these constraints clearly
+4. **Given** I change my day structure settings, **When** I refresh my agenda, **Then** the system recomputes the agenda to respect the new constraints
+
 ### Edge Cases
 
-- What happens when activities have no estimated durations? [System prompts user to estimate duration during creation]
+- What happens when activities have no estimated durations? [Agenda blocks should still be scheduled]
 - How does system handle deadlines that fall on non-working days? [Automatically adjusts to previous working day]
 - What happens when user starts timer during lunch break? [System warns user and suggests adjusting break or moving to next working block]
 - How does system handle overlapping agenda blocks? [Prevents creation and warns user about conflicts]
@@ -84,6 +101,9 @@ As a time management user, I want my agenda to adjust automatically when I start
 - What happens when timer start conflicts with agenda constraints? [Timer takes precedence with warning about agenda deviation]
 - What happens when user exceeds 100 active activities limit? [System warns user and suggests archiving completed activities]
 - What happens when agenda block count approaches 500 limit? [System shows warning and suggests consolidating similar activities]
+- What happens when lunch break duration conflicts with day start time? [System warns user and suggests adjusting either setting]
+- How does system handle invalid time formats in day structure configuration? [System validates and shows error messages for invalid formats]
+- What happens when day structure settings result in insufficient working time? [System warns user and suggests adjusting work targets or break durations]
 
 ## Requirements *(mandatory)*
 
@@ -103,6 +123,10 @@ As a time management user, I want my agenda to adjust automatically when I start
 - **FR-012**: System MUST automatically adjust agenda when user starts timer earlier than planned but within working window
 - **FR-013**: System MUST maintain all day structure constraints during agenda adjustments
 - **FR-014**: System MUST respect user's working hours, lunch breaks, and daily structure preferences in all planning calculations
+- **FR-015**: System MUST allow users to configure lunch break duration and start time for each day
+- **FR-016**: System MUST allow users to configure day start time for each day
+- **FR-017**: System MUST respect configured lunch break and day start times when generating agendas
+- **FR-018**: System MUST provide visual representation of day structure constraints in agenda views
 
 ### Key Entities *(include if feature involves data)*
 
@@ -112,6 +136,7 @@ As a time management user, I want my agenda to adjust automatically when I start
 - **Agenda Entry**: Individual work block with activity reference, timing details, execution status, and user-specified cognitive load classification (low/medium/high)
 - **Planner Adjustment**: Handles automatic agenda adjustments when user starts work earlier than planned, with timer precedence and warning system
 - **Activity**: Extended with user-defined cognitive load field and supports up to 100 active activities with 1-year historical data
+- **Day Structure Configuration**: User-configurable settings including lunch break duration and start time, and day start time for each day of the week
 
 ### Security Requirements
 
@@ -135,6 +160,12 @@ As a time management user, I want my agenda to adjust automatically when I start
 - Q: How should cognitive load be classified for activities? → A: User manually classifies each activity during creation
 - Q: How should timer-agenda conflicts be resolved? → A: Timer takes precedence with warning
 - Q: What are the data volume constraints for the planning system? → A: 100 activities, 500 agenda blocks, 1-year history
+
+### Session 2024-07-16 (Day Structure Configuration)
+
+- Q: How should day structure configuration be handled for non-working days? → A: Non-working days should have "00:00" for dayStartTimes and lunchBreakStartTimes, and 0 for lunchBreakDurations
+- Q: What happens when day structure settings conflict with existing agenda blocks? → A: System should warn user and suggest recomputing agenda to respect new constraints
+- Q: Should day structure settings be applied retroactively to existing agendas? → A: No, only affect future agenda generation unless user explicitly recomputes
 
 ## Success Criteria *(mandatory)*
 
