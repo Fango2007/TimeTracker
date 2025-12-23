@@ -243,6 +243,133 @@ TimeWise.Planner = (function() {
   }
 
   /**
+   * Feasibility Calculation
+   */
+  function calculateFeasibility(dateStr) {
+    /**
+     * Calculate daily schedule feasibility
+     * @param {string} dateStr - Date string in YYYY-MM-DD format
+     * @returns {Object} Feasibility calculation result
+     */
+    if (!config) {
+      config = loadConfig();
+    }
+    
+    // Get activities for the specified date
+    const activities = TimeWise.Storage.getActivities() || [];
+    const dateActivities = activities.filter(activity => {
+      // Filter activities scheduled for this date or with no specific schedule
+      if (activity.scheduledDays && activity.scheduledDays.length > 0) {
+        const activityDate = new Date(dateStr);
+        const activityDay = WEEKDAYS[activityDate.getDay()];
+        return activity.scheduledDays.includes(activityDay);
+      }
+      return true; // Include activities with no specific schedule
+    });
+    
+    // Calculate total duration
+    let totalDuration = 0;
+    let cognitiveLoadDistribution = {
+      intense: 0,
+      moderate: 0,
+      light: 0
+    };
+    
+    dateActivities.forEach(activity => {
+      const duration = activity.estimatedDuration || 0;
+      totalDuration += duration;
+      
+      // Track cognitive load distribution
+      const cognitiveLoad = activity.cognitiveLoad || 'moderate';
+      if (cognitiveLoadDistribution[cognitiveLoad] !== undefined) {
+        cognitiveLoadDistribution[cognitiveLoad] += duration;
+      }
+    });
+    
+    // Get day structure for the date
+    const dayStructure = getDayStructure(dateStr);
+    const dailyWorkTargetMinutes = dayStructure.totalAvailableMinutes;
+    
+    // Calculate feasibility
+    let feasibilityStatus = 'feasible';
+    let colorIndicator = 'green';
+    
+    if (totalDuration === 0) {
+      feasibilityStatus = 'feasible';
+      colorIndicator = 'green';
+    } else if (dailyWorkTargetMinutes === 0) {
+      // Non-working day
+      feasibilityStatus = 'not-applicable';
+      colorIndicator = 'gray';
+    } else {
+      const feasibilityRatio = totalDuration / dailyWorkTargetMinutes;
+      
+      if (feasibilityRatio > 1.0) {
+        feasibilityStatus = 'not-feasible';
+        colorIndicator = 'red';
+      } else if (feasibilityRatio > 0.8) {
+        feasibilityStatus = 'tight';
+        colorIndicator = 'yellow';
+      } else {
+        feasibilityStatus = 'feasible';
+        colorIndicator = 'green';
+      }
+    }
+    
+    return {
+      date: dateStr,
+      totalDurationMinutes: totalDuration,
+      dailyWorkTargetMinutes: dailyWorkTargetMinutes,
+      feasibilityStatus: feasibilityStatus,
+      colorIndicator: colorIndicator,
+      activitiesCount: dateActivities.length,
+      cognitiveLoadDistribution: cognitiveLoadDistribution
+    };
+  }
+
+  function getFeasibilityIndicator(feasibility) {
+    /**
+     * Get color indicator for feasibility
+     * @param {Object} feasibility - Feasibility object
+     * @returns {string} Color indicator (green/yellow/red/gray)
+     */
+    return feasibility ? feasibility.colorIndicator : 'gray';
+  }
+
+  function getTodayDate() {
+    /**
+     * Get today's date in YYYY-MM-DD format
+     * @returns {string} Today's date
+     */
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  }
+
+  /**
+   * Cognitive Load Management
+   */
+  function getCognitiveLoadOrder() {
+    /**
+     * Get cognitive load order (intense first)
+     * @returns {Array} Cognitive load order
+     */
+    return ['intense', 'moderate', 'light'];
+  }
+
+  /**
+   * Real-time Updates
+   */
+  function setupRealTimeUpdates() {
+    /**
+     * Set up real-time updates for feasibility calculations
+     * @returns {function} Cleanup function
+     */
+    // This would be implemented with event listeners in a real application
+    console.log('Real-time updates setup (would implement with event listeners)');
+    return () => console.log('Real-time updates cleanup');
+  }
+
+  /**
    * Public API
    */
   return {
@@ -286,10 +413,42 @@ TimeWise.Planner = (function() {
       }
     },
     
-    // Feasibility calculation (to be implemented in Phase 3)
+    // Feasibility calculation (Phase 3 - IMPLEMENTED)
     checkDailyFeasibility: function(dateStr) {
-      console.warn('checkDailyFeasibility: Not yet implemented (Phase 3)');
-      return null;
+      /**
+       * Check daily schedule feasibility
+       * @param {string} dateStr - Date string in YYYY-MM-DD format
+       * @returns {Object} Feasibility calculation result
+       */
+      return calculateFeasibility(dateStr || getTodayDate());
+    },
+    
+    getFeasibilityIndicator: function(dateStr) {
+      /**
+       * Get feasibility color indicator
+       * @param {string} dateStr - Date string in YYYY-MM-DD format
+       * @returns {string} Color indicator (green/yellow/red/gray)
+       */
+      const feasibility = calculateFeasibility(dateStr || getTodayDate());
+      return getFeasibilityIndicator(feasibility);
+    },
+    
+    // Cognitive load management
+    getCognitiveLoadOrder: function() {
+      /**
+       * Get cognitive load order
+       * @returns {Array} Cognitive load order
+       */
+      return getCognitiveLoadOrder();
+    },
+    
+    // Real-time updates
+    setupRealTimeUpdates: function() {
+      /**
+       * Set up real-time updates
+       * @returns {function} Cleanup function
+       */
+      return setupRealTimeUpdates();
     },
     
     // Agenda generation (to be implemented in Phase 5)

@@ -197,6 +197,117 @@ describe('TimeWise Planner Module', () => {
       expect(planner.validateTimeFormat(undefined)).toBe(false);
     });
   });
+
+  /**
+   * Test Suite 6: Feasibility Calculation (User Story 1)
+   */
+  describe('Feasibility Calculation', () => {
+    beforeEach(() => {
+      // Mock activities for testing
+      window.TimeWise.Storage = {
+        getActivities: () => [
+          {
+            id: 'ACT-001',
+            label: 'Intense Task',
+            cognitiveLoad: 'intense',
+            estimatedDuration: 120,
+            scheduledDays: ['monday']
+          },
+          {
+            id: 'ACT-002',
+            label: 'Moderate Task',
+            cognitiveLoad: 'moderate',
+            estimatedDuration: 180,
+            scheduledDays: ['monday']
+          },
+          {
+            id: 'ACT-003',
+            label: 'Light Task',
+            cognitiveLoad: 'light',
+            estimatedDuration: 60,
+            scheduledDays: ['monday']
+          }
+        ]
+      };
+    });
+
+    test('T025: checkDailyFeasibility should calculate feasible schedule', () => {
+      const monday = '2024-07-15'; // A Monday
+      const feasibility = planner.checkDailyFeasibility(monday);
+      
+      expect(feasibility).toBeDefined();
+      expect(feasibility.date).toBe(monday);
+      expect(feasibility.totalDurationMinutes).toBe(360); // 120 + 180 + 60
+      expect(feasibility.dailyWorkTargetMinutes).toBe(420); // 7 hours
+      expect(feasibility.feasibilityStatus).toBe('feasible');
+      expect(feasibility.colorIndicator).toBe('green');
+      expect(feasibility.activitiesCount).toBe(3);
+    });
+
+    test('T026: checkDailyFeasibility should detect tight schedule', () => {
+      // Mock activities that total exactly 80% of capacity (tight)
+      window.TimeWise.Storage.getActivities = () => [
+        {
+          id: 'ACT-004',
+          label: 'Full Day Task',
+          cognitiveLoad: 'moderate',
+          estimatedDuration: 336, // 80% of 420 minutes
+          scheduledDays: ['monday']
+        }
+      ];
+      
+      const monday = '2024-07-15';
+      const feasibility = planner.checkDailyFeasibility(monday);
+      
+      expect(feasibility.feasibilityStatus).toBe('tight');
+      expect(feasibility.colorIndicator).toBe('yellow');
+    });
+
+    test('T027: checkDailyFeasibility should detect not feasible schedule', () => {
+      // Mock activities that exceed capacity
+      window.TimeWise.Storage.getActivities = () => [
+        {
+          id: 'ACT-005',
+          label: 'Overloaded Task',
+          cognitiveLoad: 'intense',
+          estimatedDuration: 480, // Exceeds 420 minute capacity
+          scheduledDays: ['monday']
+        }
+      ];
+      
+      const monday = '2024-07-15';
+      const feasibility = planner.checkDailyFeasibility(monday);
+      
+      expect(feasibility.feasibilityStatus).toBe('not-feasible');
+      expect(feasibility.colorIndicator).toBe('red');
+    });
+
+    test('T028: checkDailyFeasibility should handle non-working days', () => {
+      const sunday = '2024-07-21'; // A Sunday
+      const feasibility = planner.checkDailyFeasibility(sunday);
+      
+      expect(feasibility.feasibilityStatus).toBe('not-applicable');
+      expect(feasibility.colorIndicator).toBe('gray');
+      expect(feasibility.dailyWorkTargetMinutes).toBe(0);
+    });
+
+    test('T029: checkDailyFeasibility should track cognitive load distribution', () => {
+      const monday = '2024-07-15';
+      const feasibility = planner.checkDailyFeasibility(monday);
+      
+      expect(feasibility.cognitiveLoadDistribution).toBeDefined();
+      expect(feasibility.cognitiveLoadDistribution.intense).toBe(120);
+      expect(feasibility.cognitiveLoadDistribution.moderate).toBe(180);
+      expect(feasibility.cognitiveLoadDistribution.light).toBe(60);
+    });
+
+    test('T030: getFeasibilityIndicator should return correct color', () => {
+      const monday = '2024-07-15';
+      const indicator = planner.getFeasibilityIndicator(monday);
+      
+      expect(indicator).toBe('green');
+    });
+  });
 });
 
 /**
