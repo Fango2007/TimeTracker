@@ -738,6 +738,94 @@ TimeWise.Planner = (function() {
       return false;
     },
     
+    // Flexible schedule adjustments (User Story 4)
+    startTimerEarly: function(entryId, actualStartTime, currentAgenda) {
+      /**
+       * Handle early timer start with agenda adjustments
+       * @param {string} entryId - Agenda entry ID
+       * @param {string} actualStartTime - Actual start time in HH:MM format
+       * @param {Object} currentAgenda - Current weekly agenda
+       * @returns {Object} Adjusted agenda with updated blocks
+       */
+      if (!currentAgenda) {
+        currentAgenda = generateWeeklyAgenda();
+      }
+      
+      // Find the agenda entry
+      let foundEntry = null;
+      let entryDate = null;
+      
+      for (const [date, entries] of Object.entries(currentAgenda.days)) {
+        foundEntry = entries.find(entry => entry.id === entryId);
+        if (foundEntry) {
+          entryDate = date;
+          break;
+        }
+      }
+      
+      if (!foundEntry) {
+        console.error(`Agenda entry ${entryId} not found`);
+        return currentAgenda;
+      }
+      
+      // Calculate time difference
+      const originalStartMinutes = parseTime(foundEntry.plannedStart);
+      const actualStartMinutes = parseTime(actualStartTime);
+      const timeDifference = actualStartMinutes - originalStartMinutes;
+      
+      // Only adjust if actually earlier
+      if (timeDifference <= 0) {
+        console.log('Timer not started early, no adjustment needed');
+        return currentAgenda;
+      }
+      
+      // Update this entry's status and timing
+      foundEntry.plannedStart = actualStartTime;
+      foundEntry.plannedEnd = formatTime(actualStartMinutes + foundEntry.durationMinutes);
+      foundEntry.status = 'executedEarlier';
+      
+      // Adjust downstream blocks on the same day
+      const dayEntries = currentAgenda.days[entryDate];
+      const entryIndex = dayEntries.findIndex(entry => entry.id === entryId);
+      
+      // Shift all subsequent entries forward by the time difference
+      for (let i = entryIndex + 1; i < dayEntries.length; i++) {
+        const entry = dayEntries[i];
+        const entryStartMinutes = parseTime(entry.plannedStart);
+        const newStartMinutes = entryStartMinutes - timeDifference;
+        
+        // Don't let entries go before the adjusted entry
+        if (newStartMinutes < actualStartMinutes + foundEntry.durationMinutes) {
+          newStartMinutes = actualStartMinutes + foundEntry.durationMinutes;
+        }
+        
+        entry.plannedStart = formatTime(newStartMinutes);
+        entry.plannedEnd = formatTime(newStartMinutes + entry.durationMinutes);
+      }
+      
+      console.log(`Agenda adjusted: Entry ${entryId} started ${timeDifference} minutes early`);
+      return currentAgenda;
+    },
+    
+    detectEarlyStart: function(actualStartTime, plannedStartTime) {
+      /**
+       * Detect if timer was started early
+       * @param {string} actualStartTime - Actual start time
+       * @param {string} plannedStartTime - Planned start time
+       * @returns {Object} Detection result with time difference
+       */
+      const actualMinutes = parseTime(actualStartTime);
+      const plannedMinutes = parseTime(plannedStartTime);
+      const difference = actualMinutes - plannedMinutes;
+      
+      return {
+        isEarly: difference > 0,
+        minutesEarly: Math.max(0, difference),
+        actualStartMinutes: actualMinutes,
+        plannedStartMinutes: plannedMinutes
+      };
+    }
+    
     // Utility functions
     validateTimeFormat: function(timeStr) {
       /**

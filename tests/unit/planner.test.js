@@ -497,6 +497,114 @@ describe('TimeWise Planner Module', () => {
     });
   });
 
+  /**
+   * Test Suite 9: Flexible Schedule Adjustments (User Story 4)
+   */
+  describe('Flexible Schedule Adjustments', () => {
+    let testAgenda;
+    
+    beforeEach(() => {
+      // Create a test agenda with multiple entries on Monday
+      testAgenda = {
+        weekId: '2024-W29',
+        weekStartDate: '2024-07-15',
+        days: {
+          '2024-07-15': [
+            {
+              id: 'AGE-001',
+              activityId: 'ACT-301',
+              plannedStart: '09:00',
+              plannedEnd: '10:30',
+              durationMinutes: 90,
+              status: 'planned',
+              cognitiveLoad: 'intense'
+            },
+            {
+              id: 'AGE-002',
+              activityId: 'ACT-302',
+              plannedStart: '10:45',
+              plannedEnd: '12:15',
+              durationMinutes: 90,
+              status: 'planned',
+              cognitiveLoad: 'moderate'
+            },
+            {
+              id: 'AGE-003',
+              activityId: 'ACT-303',
+              plannedStart: '13:00',
+              plannedEnd: '14:30',
+              durationMinutes: 90,
+              status: 'planned',
+              cognitiveLoad: 'light'
+            }
+          ]
+        },
+        dayStructureConstraints: {
+          '2024-07-15': {
+            dayStartTime: '09:00',
+            lunchBreakStart: '12:00',
+            lunchBreakEnd: '12:30',
+            workWindowEnd: '17:30',
+            totalAvailableMinutes: 450,
+            isWorkingDay: true
+          }
+        }
+      };
+    });
+
+    test('T051: detectEarlyStart should identify early starts', () => {
+      const detection = planner.detectEarlyStart('08:45', '09:00');
+      
+      expect(detection.isEarly).toBe(true);
+      expect(detection.minutesEarly).toBe(15);
+      expect(detection.actualStartMinutes).toBeLessThan(detection.plannedStartMinutes);
+    });
+
+    test('T052: detectEarlyStart should handle non-early starts', () => {
+      const detection = planner.detectEarlyStart('09:15', '09:00');
+      
+      expect(detection.isEarly).toBe(false);
+      expect(detection.minutesEarly).toBe(0);
+    });
+
+    test('T053: startTimerEarly should adjust agenda when starting early', () => {
+      const adjustedAgenda = planner.startTimerEarly('AGE-001', '08:45', testAgenda);
+      
+      // Find the adjusted entry
+      const adjustedEntry = adjustedAgenda.days['2024-07-15']
+        .find(entry => entry.id === 'AGE-001');
+      
+      expect(adjustedEntry).toBeDefined();
+      expect(adjustedEntry.status).toBe('executedEarlier');
+      expect(adjustedEntry.plannedStart).toBe('08:45');
+    });
+
+    test('T054: startTimerEarly should shift downstream blocks', () => {
+      const adjustedAgenda = planner.startTimerEarly('AGE-001', '08:45', testAgenda);
+      
+      const downstreamEntry = adjustedAgenda.days['2024-07-15']
+        .find(entry => entry.id === 'AGE-002');
+      
+      // Should be shifted earlier by 15 minutes
+      expect(downstreamEntry.plannedStart).toBe('10:30'); // 10:45 - 15 = 10:30
+    });
+
+    test('T055: startTimerEarly should not adjust if not early', () => {
+      const originalAgenda = JSON.parse(JSON.stringify(testAgenda));
+      const adjustedAgenda = planner.startTimerEarly('AGE-001', '09:15', testAgenda);
+      
+      // Should remain unchanged
+      expect(adjustedAgenda).toEqual(originalAgenda);
+    });
+
+    test('T056: startTimerEarly should handle non-existent entry gracefully', () => {
+      const adjustedAgenda = planner.startTimerEarly('NON-EXISTENT', '08:00', testAgenda);
+      
+      // Should return original agenda
+      expect(adjustedAgenda).toEqual(testAgenda);
+    });
+  });
+
 });
 
 /**
