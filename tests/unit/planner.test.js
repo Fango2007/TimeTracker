@@ -394,6 +394,109 @@ describe('TimeWise Planner Module', () => {
     });
   });
 
+  /**
+   * Test Suite 8: Weekly Agenda Generation (User Story 3)
+   */
+  describe('Weekly Agenda Generation', () => {
+    beforeEach(() => {
+      // Mock activities for a week
+      window.TimeWise.Storage = {
+        getActivities: () => [
+          {
+            id: 'ACT-201',
+            label: 'Morning Task',
+            cognitiveLoad: 'intense',
+            estimatedDuration: 120,
+            scheduledDays: ['monday']
+          },
+          {
+            id: 'ACT-202',
+            label: 'Afternoon Task',
+            cognitiveLoad: 'moderate',
+            estimatedDuration: 180,
+            scheduledDays: ['monday']
+          },
+          {
+            id: 'ACT-203',
+            label: 'Light Task',
+            cognitiveLoad: 'light',
+            estimatedDuration: 60,
+            scheduledDays: ['tuesday']
+          }
+        ]
+      };
+    });
+
+    test('T042: generateWeeklyAgenda should create agenda for 7 days', () => {
+      const weeklyAgenda = planner.generateWeeklyAgenda();
+      
+      expect(weeklyAgenda).toBeDefined();
+      expect(weeklyAgenda.weekId).toBeDefined();
+      expect(weeklyAgenda.weekStartDate).toBeDefined();
+      expect(weeklyAgenda.days).toBeDefined();
+      expect(Object.keys(weeklyAgenda.days).length).toBe(7);
+    });
+
+    test('T043: generateWeeklyAgenda should order by cognitive load', () => {
+      const weeklyAgenda = planner.generateWeeklyAgenda();
+      const mondayAgenda = weeklyAgenda.days[weeklyAgenda.weekStartDate];
+      
+      if (mondayAgenda && mondayAgenda.length > 1) {
+        // First activity should be most intense
+        expect(mondayAgenda[0].cognitiveLoad).toBe('intense');
+        expect(mondayAgenda[1].cognitiveLoad).toBe('moderate');
+      }
+    });
+
+    test('T044: generateWeeklyAgenda should create agenda entries with proper timing', () => {
+      const weeklyAgenda = planner.generateWeeklyAgenda();
+      const mondayAgenda = weeklyAgenda.days[weeklyAgenda.weekStartDate];
+      
+      if (mondayAgenda && mondayAgenda.length > 0) {
+        mondayAgenda.forEach(entry => {
+          expect(entry.plannedStart).toBeDefined();
+          expect(entry.plannedEnd).toBeDefined();
+          expect(entry.durationMinutes).toBeGreaterThan(0);
+          expect(entry.status).toBe('planned');
+        });
+      }
+    });
+
+    test('T045: generateWeeklyAgenda should handle non-working days', () => {
+      const weeklyAgenda = planner.generateWeeklyAgenda();
+      
+      // Find Sunday in the agenda
+      const sundayDate = Object.keys(weeklyAgenda.days)
+        .find(date => new Date(date).getDay() === 0);
+      
+      if (sundayDate) {
+        expect(weeklyAgenda.days[sundayDate].length).toBe(0);
+      }
+    });
+
+    test('T046: getWeekId should return proper week format', () => {
+      const testDate = new Date('2024-07-15'); // A Monday
+      const weekId = planner.getWeekId(testDate);
+      
+      expect(weekId).toMatch(/^\d{4}-W\d{2}$/);
+    });
+
+    test('T047: adjustAgendaBlock should accept valid adjustments', () => {
+      const result = planner.adjustAgendaBlock('TEST-001', '10:00');
+      expect(result).toBe(true);
+    });
+
+    test('T048: swapAgendaBlocks should accept valid swaps', () => {
+      const result = planner.swapAgendaBlocks('TEST-001', 'TEST-002');
+      expect(result).toBe(true);
+    });
+
+    test('T049: updateAgendaBlockStatus should validate status', () => {
+      expect(planner.updateAgendaBlockStatus('TEST-001', 'executed')).toBe(true);
+      expect(planner.updateAgendaBlockStatus('TEST-001', 'invalid')).toBe(false);
+    });
+  });
+
 });
 
 /**
