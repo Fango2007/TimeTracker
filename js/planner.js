@@ -357,6 +357,119 @@ TimeWise.Planner = (function() {
   }
 
   /**
+   * Global Agenda Generation (User Story 2)
+   */
+  function generateGlobalAgenda() {
+    /**
+     * Generate global work distribution across future days
+     * @returns {Object} Global agenda with work distribution
+     */
+    if (!config) {
+      config = loadConfig();
+    }
+    
+    const today = new Date();
+    const activities = TimeWise.Storage.getActivities() || [];
+    
+    // Find the latest deadline to determine time range
+    let latestDeadline = null;
+    activities.forEach(activity => {
+      if (activity.deadline) {
+        const deadlineDate = new Date(activity.deadline);
+        if (!latestDeadline || deadlineDate > latestDeadline) {
+          latestDeadline = deadlineDate;
+        }
+      }
+    });
+    
+    // If no deadlines, use 7 days from today
+    const endDate = latestDeadline || new Date();
+    endDate.setDate(today.getDate() + 7);
+    
+    // Generate daily distributions
+    const dailyDistributions = {};
+    let totalWorkHours = 0;
+    let totalDays = 0;
+    
+    // Process each day in the range
+    for (let date = new Date(today); date <= endDate; date.setDate(date.getDate() + 1)) {
+      const dateStr = date.toISOString().split('T')[0];
+      const dayOfWeek = WEEKDAYS[date.getDay()];
+      
+      // Get day structure
+      const dayStructure = getDayStructure(dateStr);
+      
+      if (dayStructure.isWorkingDay) {
+        // Filter activities for this day
+        const dayActivities = activities.filter(activity => {
+          // Check if activity should be scheduled on this day
+          if (activity.scheduledDays && activity.scheduledDays.length > 0) {
+            return activity.scheduledDays.includes(dayOfWeek);
+          }
+          
+          // If no specific schedule, check deadline
+          if (activity.deadline) {
+            const deadlineDate = new Date(activity.deadline);
+            return deadlineDate >= date;
+          }
+          
+          return true; // Include if no constraints
+        });
+        
+        // Calculate allocated minutes
+        let allocatedMinutes = 0;
+        const activityAllocations = [];
+        
+        dayActivities.forEach(activity => {
+          const duration = activity.estimatedDuration || 0;
+          allocatedMinutes += duration;
+          
+          activityAllocations.push({
+            activityId: activity.id,
+            allocatedMinutes: duration,
+            cognitiveLoad: activity.cognitiveLoad || 'moderate',
+            deadline: activity.deadline || null,
+            priority: activity.priority || 'medium'
+          });
+        });
+        
+        const remainingCapacity = dayStructure.totalAvailableMinutes - allocatedMinutes;
+        
+        dailyDistributions[dateStr] = {
+          date: dateStr,
+          allocatedActivities: activityAllocations,
+          remainingCapacityMinutes: Math.max(0, remainingCapacity),
+          isWorkingDay: true
+        };
+        
+        totalWorkHours += dayStructure.totalAvailableMinutes / 60;
+        totalDays++;
+      } else {
+        // Non-working day
+        dailyDistributions[dateStr] = {
+          date: dateStr,
+          allocatedActivities: [],
+          remainingCapacityMinutes: 0,
+          isWorkingDay: false
+        };
+      }
+    }
+    
+    const averageDailyLoad = totalDays > 0 ? totalWorkHours / totalDays : 0;
+    
+    return {
+      generatedAt: new Date().toISOString(),
+      timeRange: {
+        startDate: today.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      },
+      dailyDistributions: dailyDistributions,
+      totalWorkHours: totalWorkHours,
+      averageDailyLoad: averageDailyLoad
+    };
+  }
+
+  /**
    * Real-time Updates
    */
   function setupRealTimeUpdates() {
@@ -449,6 +562,24 @@ TimeWise.Planner = (function() {
        * @returns {function} Cleanup function
        */
       return setupRealTimeUpdates();
+    },
+    
+    // Global agenda generation (User Story 2 - IMPLEMENTED)
+    generateGlobalAgenda: function() {
+      /**
+       * Generate global work distribution across future days
+       * @returns {Object} Global agenda with work distribution
+       */
+      return generateGlobalAgenda();
+    },
+    
+    getGlobalAgenda: function() {
+      /**
+       * Get current global agenda
+       * @returns {Object} Current global agenda
+       */
+      // In a real app, this would be cached
+      return generateGlobalAgenda();
     },
     
     // Agenda generation (to be implemented in Phase 5)

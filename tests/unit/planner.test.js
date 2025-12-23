@@ -308,6 +308,92 @@ describe('TimeWise Planner Module', () => {
       expect(indicator).toBe('green');
     });
   });
+
+  /**
+   * Test Suite 7: Global Agenda Generation (User Story 2)
+   */
+  describe('Global Agenda Generation', () => {
+    beforeEach(() => {
+      // Mock activities with deadlines
+      window.TimeWise.Storage = {
+        getActivities: () => [
+          {
+            id: 'ACT-101',
+            label: 'Project A',
+            cognitiveLoad: 'intense',
+            estimatedDuration: 240,
+            deadline: '2024-07-18',
+            scheduledDays: ['thursday']
+          },
+          {
+            id: 'ACT-102',
+            label: 'Project B',
+            cognitiveLoad: 'moderate',
+            estimatedDuration: 180,
+            deadline: '2024-07-19',
+            scheduledDays: ['friday']
+          },
+          {
+            id: 'ACT-103',
+            label: 'Project C',
+            cognitiveLoad: 'light',
+            estimatedDuration: 120,
+            deadline: '2024-07-17',
+            scheduledDays: ['wednesday']
+          }
+        ]
+      };
+    });
+
+    test('T031: generateGlobalAgenda should create work distribution', () => {
+      const globalAgenda = planner.generateGlobalAgenda();
+      
+      expect(globalAgenda).toBeDefined();
+      expect(globalAgenda.generatedAt).toBeDefined();
+      expect(globalAgenda.timeRange).toBeDefined();
+      expect(globalAgenda.dailyDistributions).toBeDefined();
+      expect(globalAgenda.totalWorkHours).toBeGreaterThan(0);
+      expect(globalAgenda.averageDailyLoad).toBeGreaterThan(0);
+    });
+
+    test('T032: generateGlobalAgenda should handle activities with deadlines', () => {
+      const globalAgenda = planner.generateGlobalAgenda();
+      
+      // Should include days up to the latest deadline
+      expect(Object.keys(globalAgenda.dailyDistributions).length).toBeGreaterThan(1);
+    });
+
+    test('T033: generateGlobalAgenda should calculate remaining capacity', () => {
+      const globalAgenda = planner.generateGlobalAgenda();
+      
+      // Check that some days have remaining capacity
+      const daysWithCapacity = Object.values(globalAgenda.dailyDistributions)
+        .filter(day => day.remainingCapacityMinutes > 0);
+      
+      expect(daysWithCapacity.length).toBeGreaterThan(0);
+    });
+
+    test('T034: generateGlobalAgenda should handle non-working days', () => {
+      const globalAgenda = planner.generateGlobalAgenda();
+      
+      // Find Sunday in the distributions
+      const sundayDate = Object.keys(globalAgenda.dailyDistributions)
+        .find(date => new Date(date).getDay() === 0);
+      
+      if (sundayDate) {
+        expect(globalAgenda.dailyDistributions[sundayDate].isWorkingDay).toBe(false);
+        expect(globalAgenda.dailyDistributions[sundayDate].remainingCapacityMinutes).toBe(0);
+      }
+    });
+
+    test('T035: getGlobalAgenda should return current agenda', () => {
+      const globalAgenda = planner.getGlobalAgenda();
+      
+      expect(globalAgenda).toBeDefined();
+      expect(globalAgenda.dailyDistributions).toBeDefined();
+    });
+  });
+
 });
 
 /**
