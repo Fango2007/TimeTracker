@@ -36,8 +36,8 @@ As a time management user, I want to see how my work is distributed across futur
 1. **Given** I have activities with future deadlines, **When** I view the global agenda, **Then** I see my work distributed across remaining days up to the latest deadline
 2. **Given** I have activities with different cognitive loads, **When** the system computes the agenda, **Then** it respects my daily structure constraints and working hours
 3. **Given** I change activity durations or deadlines, **When** I refresh the view, **Then** the global agenda updates to reflect the new distribution
-4. Given I have activities with max session and daily max duration, an agenda block cannot exceed the max session duration. Several aganda blocks can be scheduled but they cannot exceed the daily max duration.
-5. Given I have a daily work target, if the sum of all activities for the day is lower then suggest to schedule others activities.  
+4. Given I have activities with max session and daily max duration, an AgendaEntry cannot exceed the max session duration. Several AgendaEntry blocks can be scheduled but they cannot exceed the daily max duration.
+5. Given I have a daily work target, if the sum of all activities for the day is lower then suggest to schedule other activities.
 
 ---
 
@@ -146,7 +146,7 @@ The following features are explicitly excluded from this planning & scheduling m
 - **Agenda Entry**: Individual work block with activity reference, timing details, execution status, and user-specified cognitive load classification (low/medium/high)
 - **Planner Adjustment**: Handles automatic agenda adjustments when user starts work earlier than planned, with timer precedence and warning system
 - **Activity**: Extended with user-defined cognitive load field and supports up to 100 active activities with 1-year historical data
-- **Day Structure Configuration**: User-configurable settings including lunch break duration and start time, and day start time for each day of the week
+- **DayStructure Configuration**: User-configurable settings including lunch break duration and start time, and day start time for each day of the week
 
 ### Security Requirements
 
@@ -165,6 +165,9 @@ The following features are explicitly excluded from this planning & scheduling m
 - **QUAL-005**: User interface MUST comply with WCAG 2.1 AA accessibility standards
 - **QUAL-006**: Error messages MUST provide actionable guidance for resolution
 - **QUAL-007**: Loading states MUST include visual indicators and estimated completion times where possible
+- **QUAL-008**: System MUST log all major operations with timestamps for debugging and auditing
+- **QUAL-009**: Error logs MUST include sufficient context without sensitive user data
+- **QUAL-010**: Performance metrics MUST be logged for continuous optimization
 
 ## Clarifications
 

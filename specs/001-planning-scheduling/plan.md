@@ -25,6 +25,11 @@ Technical approach leverages the existing browser-based architecture with enhanc
 **Target Platform**: Modern web browsers (Chrome, Firefox, Safari, Edge)
 **Project Type**: Single web application
 **Performance Goals**: All calculations complete within 1 second for 100 activities/500 agenda blocks
+**Performance Targets**:
+- Agenda generation: <500ms for typical workloads
+- Feasibility calculation: <200ms
+- UI updates: <100ms for real-time feedback
+- API response times: <300ms for all endpoints
 **Constraints**: Offline-capable, <100MB localStorage usage, real-time UI updates
 **Scale/Scope**: Single user, 100 activities, 500 agenda blocks, 1-year historical data
 
