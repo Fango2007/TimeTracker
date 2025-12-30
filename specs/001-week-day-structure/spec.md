@@ -58,11 +58,11 @@ Users may need to override the default weekly structure for specific days.
 
 ### Edge Cases
 
-- What happens when a user tries to configure overlapping working windows?
+- What happens when a user tries to configure overlapping working windows? [RESOLVED: It shouldn't be possible]
 - How does the system handle conflicting overrides for the same date? [RESOLVED: Last saved override takes precedence]
-- What happens when a user sets a work day end time before the start time?
+- What happens when a user sets a work day end time before the start time? [RESOLVED: It shouldn't be possible]
 - How does the system handle day light saving time changes affecting working hours?
-- What happens when a user tries to schedule activities outside configured working windows?
+- What happens when a user tries to schedule activities outside configured working windows? [RESOLVED: It shouldn't be possible]
 
 ## Requirements *(mandatory)*
 
