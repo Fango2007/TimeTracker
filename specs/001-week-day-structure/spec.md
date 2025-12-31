@@ -106,6 +106,13 @@ Users may need to override the default weekly structure for specific days.
 - Q: What specific error messages should be shown when validation fails? → A: System MUST show clear, user-friendly error messages for all validation failures
 - Q: Should the weekly rhythm configuration be applied retroactively to historical data, or only to future dates? → A: Weekly rhythm configuration should only apply to future dates
 
+### Session 2025-01-30
+- Q: What are the expected performance targets for the weekly rhythm configuration? → A: Configuration should load and apply within 100ms for typical user data
+- Q: What security measures should be implemented for storing user weekly rhythm configuration data? → A: Data should be validated and sanitized to prevent injection attacks
+- Q: What accessibility requirements should be considered for the weekly rhythm configuration interface? → A: Should be keyboard navigable and support screen readers
+- Q: How should the system handle daylight saving time changes affecting working hours? → A: System should store times in UTC and adjust based on local timezone
+- Q: What rate limiting or throttling mechanisms should be implemented for configuration changes? → A: No rate limiting required - configuration changes are infrequent
+
 ## Assumptions
 
 - Weekly rhythm configuration should only apply to future dates and not be retroactive
